@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="抽象标识封面：九宫格符号与半山图形">
+  <rect width="1200" height="900" fill="#F5F0E4"/>
+  <g stroke="#17140F" stroke-width="1" opacity=".2">
+    <path d="M120 90v720M400 90v720M680 90v720M960 90v720"/>
+    <path d="M120 90h840M120 330h840M120 570h840M120 810h840"/>
+  </g>
+  <g fill="none" stroke="#17140F" stroke-width="2.2">
+    <circle cx="260" cy="210" r="58"/>
+    <path d="M260 152v116M202 210h116"/>
+    <rect x="500" y="132" width="116" height="116"/>
+    <circle cx="820" cy="210" r="58"/><path d="M820 210v-58"/>
+  </g>
+  <path d="M120 570 L260 330 L400 570 Z" fill="#17140F"/>
+  <path d="M400 570 L540 330 L680 570 Z" fill="#C8452D"/>
+  <g fill="none" stroke="#17140F" stroke-width="2.2">
+    <circle cx="820" cy="450" r="58"/><circle cx="820" cy="450" r="24"/>
+    <rect x="180" y="698" width="70" height="70"/><rect x="270" y="698" width="70" height="70"/>
+    <path d="M500 810v-112M444 754h112"/>
+  </g>
+  <circle cx="886" cy="754" r="56" fill="#17140F"/>
+  <text x="886" y="764" text-anchor="middle" font-family="Songti SC, SimSun, serif" font-size="42" fill="#F5F0E4">山</text>
+  <g font-family="Consolas, monospace" fill="#17140F">
+    <text x="120" y="54" font-size="15" letter-spacing="6" opacity=".7">HALF MOUNTAIN / IDENTITY SYSTEM</text>
+    <text x="960" y="842" font-size="12" letter-spacing="3" opacity=".45" text-anchor="end">示例封面 · 2024</text>
+  </g>
+  <rect x="960" y="90" width="1" height="720" fill="#17140F" opacity=".2"/>
+</svg>

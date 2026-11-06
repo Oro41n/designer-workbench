@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="抽象画册封面：左右页面与山形色块">
+  <rect width="1200" height="900" fill="#E9E2D2"/>
+  <rect x="70" y="80" width="510" height="740" fill="#F6F1E5"/>
+  <rect x="618" y="80" width="510" height="740" fill="#F6F1E5"/>
+  <line x1="599" y1="80" x2="599" y2="820" stroke="#17140F" stroke-width="1" opacity=".3"/>
+  <g stroke="#17140F" stroke-width="1" opacity=".18">
+    <path d="M110 130h430M110 730h430M660 130h430M660 730h430"/>
+    <path d="M110 130v-30M540 130v-30M660 130v-30M1090 130v-30"/>
+  </g>
+  <rect x="110" y="160" width="330" height="420" fill="#17140F"/>
+  <path d="M110 580 L280 360 L380 470 L440 380 L440 580 Z" fill="#C8452D"/>
+  <text x="110" y="666" font-family="Consolas, monospace" font-size="14" letter-spacing="4" fill="#17140F" opacity=".6">MOUNTAIN TEA / 16P</text>
+  <g font-family="Songti SC, SimSun, serif" fill="#17140F">
+    <text x="700" y="210" font-size="150">山</text>
+    <text x="700" y="370" font-size="150">茶</text>
+  </g>
+  <line x1="700" y1="430" x2="1060" y2="430" stroke="#17140F" stroke-width="1"/>
+  <g font-family="Consolas, monospace" font-size="13" fill="#17140F" opacity=".62">
+    <text x="700" y="470">山野之间，一盏清茶。</text>
+    <text x="700" y="496">BRAND BOOK / 2025</text>
+    <text x="700" y="522">PAPER 120g / SPOT RED</text>
+  </g>
+  <rect x="700" y="580" width="80" height="80" fill="#C8452D"/>
+  <circle cx="1010" cy="640" r="46" fill="none" stroke="#17140F" stroke-width="1.5"/>
+  <text x="1010" y="648" text-anchor="middle" font-family="Songti SC, SimSun, serif" font-size="26" fill="#17140F">茶</text>
+  <text x="70" y="866" font-family="Consolas, monospace" font-size="12" fill="#17140F" opacity=".45">示例封面 / 抽象几何 · 非真实项目</text>
+  <text x="1000" y="866" font-family="Consolas, monospace" font-size="12" fill="#17140F" opacity=".45">01 — 02</text>
+</svg>

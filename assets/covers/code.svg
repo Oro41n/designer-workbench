@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="抽象编程封面：深色代码界面与朱红光标">
+  <rect width="1200" height="900" fill="#15130F"/>
+  <g stroke="#F4F0E7" stroke-width="1" opacity=".08">
+    <path d="M0 75h1200M0 825h1200"/>
+    <path d="M75 0v900M1125 0v900"/>
+  </g>
+  <circle cx="96" cy="44" r="7" fill="#C8452D"/>
+  <circle cx="120" cy="44" r="7" fill="#F4F0E7" opacity=".35"/>
+  <circle cx="144" cy="44" r="7" fill="#F4F0E7" opacity=".18"/>
+  <text x="1130" y="54" text-anchor="end" font-family="Consolas, monospace" font-size="13" letter-spacing="3" fill="#F4F0E7" opacity=".5">C++ / PRACTICE</text>
+  <g font-family="Consolas, monospace" font-size="16">
+    <text x="120" y="170" fill="#C8452D">#include</text><text x="250" y="170" fill="#F4F0E7" opacity=".8">&lt;iostream&gt;</text>
+    <text x="120" y="220" fill="#C8452D">int</text><text x="176" y="220" fill="#F4F0E7" opacity=".8">main() {</text>
+    <text x="176" y="270" fill="#F4F0E7" opacity=".45">// 记录今天的专注</text>
+    <text x="176" y="320" fill="#F4F0E7" opacity=".8">std::vector&lt;Item&gt; list;</text>
+    <text x="176" y="370" fill="#F4F0E7" opacity=".8">list.push_back(</text><text x="390" y="370" fill="#C8452D">"海报"</text><text x="470" y="370" fill="#F4F0E7" opacity=".8">);</text>
+    <text x="176" y="420" fill="#F4F0E7" opacity=".8">for (</text><text x="238" y="420" fill="#C8452D">auto</text><text x="298" y="420" fill="#F4F0E7" opacity=".8">&amp; it : list) {</text>
+    <text x="238" y="470" fill="#F4F0E7" opacity=".8">std::cout &lt;&lt; it &lt;&lt; </text><text x="440" y="470" fill="#C8452D">'\n'</text><text x="480" y="470" fill="#F4F0E7" opacity=".8">;</text>
+    <text x="176" y="520" fill="#F4F0E7" opacity=".8">}</text>
+    <text x="176" y="570" fill="#C8452D">return</text><text x="250" y="570" fill="#F4F0E7" opacity=".8">0;</text>
+    <text x="120" y="620" fill="#F4F0E7" opacity=".8">}</text>
+  </g>
+  <rect x="120" y="651" width="10" height="20" fill="#C8452D"/>
+  <g stroke="#F4F0E7" opacity=".25">
+    <path d="M760 640h330M760 680h260M760 720h300"/>
+  </g>
+  <text x="760" y="580" font-family="Songti SC, SimSun, serif" font-size="54" fill="#F4F0E7">从设计到代码</text>
+  <text x="760" y="616" font-family="Consolas, monospace" font-size="13" letter-spacing="4" fill="#F4F0E7" opacity=".5">FIRST STEP, 2026</text>
+  <g font-family="Consolas, monospace" font-size="100" fill="none" stroke="#C8452D" stroke-width="2" opacity=".85">
+    <text x="760" y="830">C++</text>
+  </g>
+  <text x="1130" y="860" text-anchor="end" font-family="Consolas, monospace" font-size="12" fill="#F4F0E7" opacity=".35">示例封面 / 抽象代码</text>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="抽象海报封面：朱红圆形与城市折叠字样">
+  <rect width="1200" height="900" fill="#F1EBDD"/>
+  <g stroke="#17140F" stroke-width="1" opacity=".14">
+    <path d="M0 150h1200M0 300h1200M0 450h1200M0 600h1200M0 750h1200"/>
+    <path d="M150 0v900M300 0v900M450 0v900M600 0v900M750 0v900M900 0v900M1050 0v900"/>
+  </g>
+  <circle cx="820" cy="330" r="300" fill="#C8452D"/>
+  <circle cx="820" cy="330" r="300" fill="none" stroke="#17140F" stroke-width="2" opacity=".35"/>
+  <rect x="150" y="132" width="170" height="8" fill="#17140F"/>
+  <text x="150" y="178" font-family="Consolas, monospace" font-size="17" letter-spacing="5" fill="#17140F" opacity=".65">CITY / FOLD</text>
+  <g font-family="Songti SC, SimSun, serif" font-size="132" fill="#17140F">
+    <text x="150" y="340">城</text>
+    <text x="150" y="470">市</text>
+    <text x="150" y="600">折</text>
+    <text x="150" y="730">叠</text>
+  </g>
+  <text x="760" y="610" font-family="Consolas, monospace" font-size="15" letter-spacing="4" fill="#F1EBDD">2025 文化节主视觉</text>
+  <text x="760" y="642" font-family="Consolas, monospace" font-size="15" letter-spacing="4" fill="#F1EBDD">10.01 — 10.07</text>
+  <rect x="760" y="676" width="46" height="4" fill="#F1EBDD"/>
+  <g stroke="#17140F" stroke-width="2" opacity=".5">
+    <path d="M36 36h48M36 36v48M1164 36h-48M1164 36v48"/>
+    <path d="M36 864h48M36 864v-48M1164 864h-48M1164 864v-48"/>
+  </g>
+  <text x="36" y="838" font-family="Consolas, monospace" font-size="13" fill="#17140F" opacity=".55">NO. 001 / 示例</text>
+  <g opacity=".9">
+    <rect x="880" y="700" width="250" height="1" fill="#17140F"/>
+    <text x="880" y="728" font-family="Songti SC, SimSun, serif" font-size="34" fill="#17140F">留白，是一种秩序。</text>
+  </g>
+</svg>
