@@ -450,7 +450,8 @@ html[data-theme="light"] .hero-scrim {
   .site-header { height: 62px; }
   #palette-open { display: none; }
   .hero { min-height: 92svh; }
-  .hero-top { top: 84px; }
+  .hero-top { top: 84px; gap: 14px; font-size: 9px; letter-spacing: 0.14em; }
+  .hero-top span:nth-child(3) { display: none; }
   .hero-title { font-size: clamp(64px, 19vw, 120px); }
   .hero-foot { flex-direction: column; align-items: flex-start; }
   .hero-meta { width: 100%; justify-content: space-between; }

@@ -100,9 +100,13 @@ body:not(.is-editor) input[type="checkbox"] { accent-color: var(--accent); }
   padding: 0 0 16px; margin-bottom: 24px; border-bottom: 1px solid var(--line);
   background: transparent;
 }
-.toolbar-search { flex: 1 1 260px; min-width: 200px; max-width: 420px; display: flex; align-items: center; }
-.toolbar-search input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 2px; }
-.toolbar-search input:focus { border-color: var(--accent); background: transparent; }
+.toolbar-search { flex: 1 1 260px; min-width: 200px; max-width: 420px; display: flex; align-items: center; border: 0; background: transparent; padding: 0; border-radius: 0; }
+body:not(.is-editor) .toolbar-search input {
+  width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0; padding: 9px 2px;
+}
+body:not(.is-editor) .toolbar-search input:focus { border-bottom-color: var(--accent); background: transparent; }
+.toolbar-search svg { color: var(--ink-faint); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .select-wrap { display: inline-flex; }
 .board-total, .toolbar-note, .toolbar-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--ink-faint); }
