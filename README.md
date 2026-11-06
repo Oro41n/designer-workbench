@@ -3,9 +3,10 @@
 一个面向平面设计师的个人工作台：项目看板、作品集（设计 + 编程）、学习打卡、灵感素材库、番茄钟，以及内置的印前画板工具（类 Figma Lite：无限画布、图层、属性、PNG / SVG 导出）。纯静态站点，原生 HTML / CSS / ES Modules，无构建、无外部 CDN，数据保存在本机浏览器。
 
 - 入口：[`index.html`](index.html)
-- 设计概念：**Night Press / 夜间印刷剧场**——近黑底、纸白字、朱红强调，衬线大标题配等宽编号；以大幅影像、整屏分镜、滚动视差、页面幕布转场、悬停大图预览与自定义光标作为主视觉，不做普通后台面板。
-- 主题：深色（默认）`#0a0a0b` 底 / `#f2efe8` 字 / 强调 `#ff4b2b`；浅色 `#f2efe9` 底 / `#121110` 字 / 强调 `#cf3418`。正文对比度达 WCAG AA。
-- 动效：路由幕布（编号 + 页面名）、入场分镜（`reveal` / `reveal-clip`）、滚动进度条与 `[data-par]` 视差、作品行悬停大图、自定义光标「VIEW」。全部遵循 `prefers-reduced-motion`。
+- 设计概念：**Living Press / 活的印刷机**（v3）——程序化 WebGL 流体影像层 + 由图片主色驱动的全站主题 + 多层影像拼贴 + 遮罩文字揭示。首屏不是静态大图模板：噪声场由时间与指针驱动缓慢呼吸，色相来自当前图流的第一张图。
+- 主题：4 个基色（`--bg` / `--ink` / `--accent` / `--accent-2`）由 Canvas 从图片像素提取（40×40 采样 + 5 簇 k-means），并映射为全站的背景 / 文字 / 强调 / 渐变 / 描边；换图时以 900ms 缓动插值过渡，深色与浅色模式都重新计算。每次刷新页面都会重新拉图、重新取色。
+- 动效与交互：页面幕布转场、文字遮罩逐行揭示、影像拼贴随光标与滚动分层视差（`data-depth`）、磁性按钮（`data-magnet`）、悬停位移、作品行悬浮大图、自定义光标「VIEW / THEME」。全部遵循 `prefers-reduced-motion`（降级为静态帧）。
+- 状态：v3 首页已上线；作品 / 项目 / 画板 / 学习 / 灵感 / 设置六个内页仍沿用 v2 皮肤，正在按 v3 令牌迁移，功能与本地数据保持兼容。
 - 适配：1600 / 1180 / 1000 / 860 / 640 / 390 六档；移动端底部导航，页面无横向滚动。
 
 ## 功能
@@ -23,21 +24,33 @@
 
 全局：固定顶栏（品牌 / 编号导航 / 命令 / 搜索 / 主题）、移动端底部导航、**命令面板 `⌘K` / `Ctrl+K`**（搜索并跳转页面 / 项目 / 作品 / 画板，执行「新建画板 / 新建项目 / 开始专注 / 切换主题」）、`/` 快捷键搜索、`Esc` 关闭弹层、跳转到主内容的 skip link、可见 focus、`aria` 标签、`prefers-reduced-motion`、空状态、保存状态提示、Toast 反馈。示例数据均带「示例」标记。
 
-## Midjourney 灵感源：快照 · 非实时
+## 图流与配色引擎（v3）
 
-首页的「Midjourney 灵感」区块是**人工策展的快照，不是实时抓取**。页面与卡片上始终标注「快照 · 非实时」、快照日期与最后抓取结果；数据文件为 [`assets/data/mj-feed.json`](assets/data/mj-feed.json)，刷新方式为人工更新（当前 `refreshPolicy: manual`，快照日期 2026-11-06）。
+首页的「此刻的颜色」图流**不是 Midjourney 抓取**，而是可公开访问、许可清晰的图库；每次加载都重新取图、重新取色。
 
-2026-11-06 实测结论（均记录在 JSON 的 `lastAttempt` 字段）：
+| 项 | 说明 |
+| --- | --- |
+| 默认源 | Lorem Picsum（`https://picsum.photos`，随机图片服务，图片来自 Unsplash，遵循 [Unsplash License](https://unsplash.com/license)） |
+| 其它源 | Unsplash（需免费 Access Key）、Pexels（需免费 API Key）、Openverse（CC，无需 Key）。全部通过 `assets/js/feed/adapters.js` 实现 |
+| 切换方式 | 改 `assets/js/feed/config.js` 的 `source` / `keys`，或在设置页写入 `localStorage['dw.feed.v1']`；不写代码即可换源 |
+| 刷新机制 | 每次页面加载生成新的随机种子（Picsum）或请求 `/photos/random`（Unsplash），不缓存历史结果；「换一批」按钮立即重新拉取 |
+| 取色 | 图片经 CORS 代理读取像素 → 40×40 缩略 → 5 簇 k-means → 映射 `--bg` / `--ink` / `--accent` / `--accent-2` → 900ms 插值过渡。取色失败时回退品牌色并在面板标注原因 |
+| 许可与署名 | 卡片与说明区展示来源、许可链接与作者；Unsplash / Pexels 适配器按各自 API 指南附带作者主页与 `utm` 链接 |
+| 限制 | Picsum 的 `v2/list` 接口未返回 CORS 头，因此不使用其作者元数据（卡片署名为「Lorem Picsum / Unsplash」）；`images.weserv.nl` 仅作为读取像素的代理，图片展示仍直连原站；本机网络访问 `api.openverse.org` 超时（地区性限制），Openverse 失败会自动降级到 Picsum；网络完全不可用时显示站内备用图并明确标注「非实时」 |
+
+> 说明：`images.weserv.nl` 是第三方图片代理，用于绕过 CORS 读取像素；如果代理不可用，图片仍能显示，但取色会失败并回退默认色板。
+
+### Midjourney：没有可接入的公开图流（2026-11-06 实测）
 
 | 路径 | 结果 |
 | --- | --- |
-| `www.midjourney.com/explore` 直接抓取 | `403` + Cloudflare「Just a moment」，浏览器可以打开，但脚本/GitHub Actions runner 拿不到页面 |
+| 官方 API / 开发者计划 | 不存在。2026 年仍只有 Discord 与 midjourney.com 网页端，无公开 API、无 SDK、无 Key 申请入口 |
+| `www.midjourney.com/explore` 脚本抓取 | `403` + Cloudflare 质询，浏览器可访问，脚本与 GitHub Actions runner 均不可 |
 | `/api/app/recent-jobs` | `401`，需要登录态 |
-| `cdn.midjourney.com` 图片直链 | `403`，带 / 不带 `Referer` 均拒绝热链 |
-| GitHub Actions 定时抓取 | runner 同样 `403` |
-| `wsrv.nl` 图片代理 | `404`，无法作为兜底 |
+| `cdn.midjourney.com` 直链 | `403`，带 / 不带 Referer 均拒绝热链 |
+| 公开镜像 / 授权图流 | 未找到任何可公开访问且许可清晰的 MJ 图流镜像；不采用「伪实时」包装 |
 
-因此纯静态 Pages 既不能抓取也不能热链 Midjourney 广场图。这里不做伪造实时：只保留 6 条人工策展的提示词快照，失败时用本地兜底数据，绝不改写时间或伪装成实时。若后续切换到支持 API 的图库（用户仍在评估），只需替换 `assets/data/mj-feed.json` 的生成脚本与 `freshness` 文案，页面结构无需改动。
+结论：v3 **不接入 Midjourney**，页面上直接写明这一点；首页图流改用上述图库，并保证「每次加载换图 + 真实取色」。`assets/data/mj-feed.json` 仅作为 v2 的历史快照保留，标记为「快照 · 非实时」，不再出现在新首页。
 
 ## 画板工具（Lite Figma）
 

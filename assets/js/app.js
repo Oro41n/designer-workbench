@@ -1,5 +1,6 @@
 // 应用入口（2026 重构）：外壳、路由转场、滚动叙事、光标交互
 import { initStore, getState, subscribe, setTheme, applyTheme } from './store.js';
+import { initThemeEngine, setMode, refreshTheme } from './theme-engine.js';
 import { icon } from './icons.js';
 import { subscribeTimer, timeText } from './pomodoro.js';
 import { openSearch } from './search.js';
@@ -42,6 +43,8 @@ let parallaxEls = [];
 let rafPending = false;
 
 initStore();
+initThemeEngine();
+setMode(getState().theme === 'light' ? 'light' : 'dark');
 syncBodyTheme();
 renderShell();
 applyTheme();
@@ -236,7 +239,7 @@ function bindPageEffects() {
       preview.style.top = `${py}px`;
       raf = requestAnimationFrame(loop);
     };
-    viewEl.querySelectorAll('.work-row[data-preview]').forEach(row => {
+    viewEl.querySelectorAll('.work-row[data-preview], .hv-work[data-preview]').forEach(row => {
       row.addEventListener('pointerenter', () => {
         const src = row.dataset.preview;
         const img = preview.querySelector('img');
@@ -288,11 +291,15 @@ function bindCursor() {
 
   document.addEventListener('pointerover', e => {
     const target = e.target.closest?.('a, button, [role="button"], input, select, textarea, [data-cursor]');
-    cursor.classList.toggle('is-link', !!target && target.dataset.cursor !== 'view');
-    cursor.classList.toggle('is-view', target?.dataset.cursor === 'view');
+    const type = target?.dataset?.cursor;
+    cursor.classList.toggle('is-view', type === 'view');
+    cursor.classList.toggle('is-theme', type === 'theme');
+    cursor.classList.toggle('is-link', !!target && !type);
+    const label = cursor.querySelector('.cursor-label');
+    if (label) label.textContent = type === 'theme' ? 'THEME' : 'VIEW';
   });
   document.addEventListener('pointerout', e => {
-    if (!e.relatedTarget) { cursor.classList.remove('is-link', 'is-view'); }
+    if (!e.relatedTarget) { cursor.classList.remove('is-link', 'is-view', 'is-theme'); }
   });
 }
 
@@ -312,6 +319,7 @@ function bindGlobal() {
   document.getElementById('theme-toggle')?.addEventListener('click', () => {
     const next = getState().theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
+    setMode(next);
     syncBodyTheme();
     updateThemeIcon();
     hydrateImages?.(document);

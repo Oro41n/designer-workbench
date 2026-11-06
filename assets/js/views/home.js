@@ -1,18 +1,12 @@
-﻿// 首页（2026 重构）：影像剧场 + 作品索引 + 灵感快照 + 收敛工作台
-import { getState, subscribe } from '../store.js';
+// 首页 v3：程序化影像层 + 图流 + 从图片取色驱动全站主题
+import { getState, subscribe, } from '../store.js';
 import { icon } from '../icons.js';
 import { escapeHtml, formatCN, todayISO, weekDates } from '../util.js';
-import { getImageURL, hydrateImages } from '../images.js';
+import { hydrateImages } from '../images.js';
 import { countBoards } from '../boards.js';
-
-const MJ_FALLBACK = {
-  source: 'Midjourney 公开广场',
-  sourceUrl: 'https://www.midjourney.com/explore',
-  mode: 'curated-snapshot',
-  updatedAt: '2026-11-06',
-  lastAttempt: { at: null, status: 403, note: 'Cloudflare 管理型质询，抓取与热链均被拦截' },
-  items: []
-};
+import { loadFeed, loadBitmap } from '../feed/index.js';
+import { applyImagePalette, applyPalette, extractPalette, paletteFromClusters, currentColors, onPalette } from '../theme-engine.js';
+import { createInkField } from '../ink-field.js';
 
 const ART = {
   '海报': 'assets/img/work-poster.webp',
@@ -23,46 +17,74 @@ const ART = {
   '编程练习': 'assets/img/work-web.webp'
 };
 
-const FALLBACK_FEED = [
-  { prompt: 'brutalist concrete interior, single shaft of morning light, dust in the air', model: 'v6.1', author: 'community', tone: 'rgba(255,75,43,.45)' },
-  { prompt: 'editorial fashion still life, vermilion silk on black stone, hard flash', model: 'v6.1', author: 'community', tone: 'rgba(180,140,255,.35)' },
-  { prompt: 'Japanese book design, oversized negative space, one red page', model: 'niji 6', author: 'community', tone: 'rgba(120,200,255,.3)' },
-  { prompt: 'chrome liquid sculpture, studio backdrop, ultra minimal product shot', model: 'v6.1', author: 'community', tone: 'rgba(255,255,255,.22)' },
-  { prompt: 'night city through wet glass, cinematic grain, no people', model: 'v6.1', author: 'community', tone: 'rgba(255,190,80,.32)' },
-  { prompt: 'risograph poster texture, misregistered ink, abstract geometry', model: 'v6', author: 'community', tone: 'rgba(255,75,43,.32)' }
+const STILLS = [
+  { src: 'assets/img/work-poster.webp', a: '01 / 城市文化节', b: 'Poster · 2025' },
+  { src: 'assets/img/work-packaging.webp', a: '02 / 明月 · 礼盒', b: 'Packaging · 2024' },
+  { src: 'assets/img/work-brochure.webp', a: '03 / 山茶研究所', b: 'Editorial · 2025' }
 ];
 
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function thumbOf(src = '') {
+  return src.replace(/w=1400/g, 'w=460').replace(/w=1600/g, 'w=460');
+}
+
 export default {
-  mount(root, ctx) {
+  mount(root, ctx = {}) {
     let feed = null;
     let boardCount = 0;
     let off = null;
+    let field = null;
+    let clockTimer = 0;
+    let raf = 0;
     let destroyed = false;
+    let activeIndex = 0;
+    let palettes = [];
+    let offPalette = null;
+    const cleanups = [];
 
     render();
-    off = subscribe(() => render());
-    loadFeed();
+    off = subscribe(() => refreshStats());
+    let lastPaletteRef = null;
+    offPalette = onPalette(palette => {
+      if (palette === lastPaletteRef) return;
+      lastPaletteRef = palette;
+      if (palette?.bg) paintSwatches(palette);
+    });
+
+    loadFeed().then(data => {
+      if (destroyed) return;
+      feed = data;
+      applyFeed();
+    }).catch(err => {
+      console.warn('图流加载失败', err);
+    });
+
     countBoards().then(n => {
       if (destroyed) return;
       boardCount = n;
       root.querySelectorAll('[data-boards]').forEach(el => { el.textContent = String(n); });
     });
 
+    bindChrome();
+    bindMotion();
+
     return {
       destroy() {
         destroyed = true;
         off?.();
-        document.querySelectorAll('body > .work-preview').forEach(el => el.remove());
+        offPalette?.();
+        field?.destroy();
+        clearInterval(clockTimer);
+        cancelAnimationFrame(raf);
+        cleanups.forEach(fn => { try { fn(); } catch { /* noop */ } });
+        document.querySelectorAll('body > .hv-work-preview, body > .work-preview').forEach(el => el.remove());
       }
     };
 
-    function coverOf(work) {
-      if (work.imageId) return '';
-      if (work.sample && ART[work.category]) return ART[work.category];
-      return work.cover || ART[work.category] || 'assets/img/work-poster.webp';
-    }
+    /* ---------------- 结构 ---------------- */
 
-    async function render() {
+    function render() {
       const state = getState();
       const works = [...state.portfolio].sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
       const featured = works.slice(0, 6);
@@ -72,259 +94,460 @@ export default {
         .reduce((sum, s) => sum + (s.minutes || 0), 0);
       const activeProjects = state.projects.filter(p => p.status !== '交付');
       const tasks = [...state.tasks].sort((a, b) => Number(a.done) - Number(b.done)).slice(0, 4);
-      const nextDeadline = state.projects
-        .filter(p => p.status !== '交付' && p.deadline)
-        .sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
-
       const name = String(state.profile.name || '').replace(/^示例\s*·\s*/, '').trim() || '你的名字';
       const rawName = state.profile.name || '';
       const isSample = rawName.startsWith('示例');
 
       root.innerHTML = `
-      <section class="hero">
-        <div class="hero-media">
-          <img src="assets/img/hero.webp" alt="深色桌面上的朱红纸张印刷作品" data-par="0.06">
-        </div>
-        <div class="hero-scrim"></div>
+      <section class="hv-hero" id="top">
+        <canvas class="hv-field" data-field aria-hidden="true"></canvas>
+        <div class="hv-grid" aria-hidden="true"></div>
 
-        <div class="hero-top">
-          <span><i class="pulse"></i>Open for work · 2026</span>
-          <span>${escapeHtml(state.profile.location || '远程 / 中国')}</span>
-          <span>Portfolio &amp; Workbench</span>
+        <div class="hv-hero-top">
+          <span class="hv-live"><i></i>Live palette signal</span>
+          <span class="hv-clock" data-clock>--:--:--</span>
         </div>
 
-        <div class="hero-copy">
-          <div class="hero-eyebrow">Graphic design / Front-end</div>
-          <h1 class="hero-title">
-            <span class="line"><span>ORO<em>®</em></span></span>
-            <span class="line line--sub"><span>Design × Code</span></span>
-          </h1>
-        </div>
-
-        <div class="hero-foot">
-          <p class="hero-lede">
-            ${escapeHtml(name)}${isSample ? '（示例资料）' : ''} · ${escapeHtml(state.profile.role || '平面设计师')}。
-            把纸上的排版经验，翻译成屏幕上的交互。这里同时归档<strong>设计作品</strong>与<strong>编程作品</strong>。
-          </p>
-          <div class="hero-meta">
-            <div>基于<b>${works.length} 件作品</b></div>
-            <div>本周专注<b>${focusMinutes} 分钟</b></div>
-            <div>画板<b><span data-boards>${boardCount}</span> 张</b></div>
+        <div class="hv-hero-main">
+          <div class="hv-copy">
+            <p class="hv-kicker"><span>01</span> Index / Portfolio &amp; Workbench</p>
+            <h1 class="hv-title">
+              <span class="mask-line"><span style="--d:0">ORO<em>®</em></span></span>
+              <span class="mask-line"><span style="--d:1"><span class="hv-sub">Design <b>×</b> Code</span></span></span>
+            </h1>
+            <p class="hv-note">
+              ${escapeHtml(name)}${isSample ? '（示例资料）' : ''} · ${escapeHtml(state.profile.role || '平面设计师')}。
+              纸上的排版经验，正在被翻译成屏幕里的交互。这里同时归档设计与编程作品，
+              并让一束随图像变化的颜色，决定这个页面此刻的样子。
+            </p>
+          </div>
+          <div class="hv-visual">
+            <div class="hv-stage" aria-hidden="true">
+              <figure class="hv-plate hv-plate--a" data-depth="14"><img alt="" data-plate="0"><figcaption>Signal 01</figcaption></figure>
+              <figure class="hv-plate hv-plate--b" data-depth="26"><img alt="" data-plate="1"><figcaption>Signal 02</figcaption></figure>
+              <figure class="hv-plate hv-plate--c" data-depth="42"><img alt="" data-plate="2"><figcaption>03</figcaption></figure>
+            </div>
+            <aside class="hv-side" aria-label="当前配色">
+              <span class="hv-side-label">Palette / 当前取色</span>
+              <div class="hv-swatches" data-swatches>
+                ${[0, 1, 2, 3, 4].map(() => '<i class="hv-swatch" style="background:var(--bg-3)"></i>').join('')}
+              </div>
+              <p class="hv-hex" data-hex>等待图流…</p>
+              <p class="hv-src" data-theme-source><b>取色中</b> · 来自图流第一张</p>
+            </aside>
           </div>
         </div>
 
-        <a class="scroll-cue" href="#works" aria-label="滚动到作品">
-          Scroll
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M12 4v15"/><path d="m6 13 6 6 6-6"/></svg>
-        </a>
-      </section>
-
-      <div class="ticker" aria-hidden="true">
-        <div class="ticker-track">
-          ${tickerGroup()}
-          ${tickerGroup()}
-        </div>
-      </div>
-
-      <section class="section" id="works">
-        <div class="section-head reveal">
-          <div>
-            <div class="section-kicker">01 / Selected works</div>
-            <h2 class="section-title">作品选集</h2>
+        <div class="hv-hero-foot">
+          <div class="hv-stats">
+            <div class="hv-stat"><b>${works.length}</b><span>归档作品</span></div>
+            <div class="hv-stat"><b>${activeProjects.length}</b><span>进行中项目</span></div>
+            <div class="hv-stat"><b>${focusMinutes}</b><span>本周专注 / 分钟</span></div>
+            <div class="hv-stat"><b><span data-boards>${boardCount}</span></b><span>画板</span></div>
           </div>
-          <a class="section-link" href="#/portfolio">全部作品 ${icon('arrow', 12)}</a>
-        </div>
-        <div class="works-list reveal" data-stagger>
-          ${featured.map((w, i) => `
-            <a class="work-row" href="#/portfolio/${w.id}" data-preview="${coverOf(w)}" data-cursor="view" style="--i:${i}">
-              <span class="w-index">${String(i + 1).padStart(2, '0')}</span>
-              <span class="w-title">${escapeHtml(w.title)}</span>
-              <span class="w-meta">${escapeHtml(w.section === 'code' ? 'CODE' : (w.category || 'DESIGN'))} / ${escapeHtml(w.role || '')}</span>
-              <span class="w-year">${escapeHtml(w.year || '')}</span>
-              <span class="w-arrow">${icon('arrow', 16)}</span>
-            </a>`).join('')}
-        </div>
-        <div class="work-preview" aria-hidden="true"><img alt=""></div>
-      </section>
-
-      <section class="section">
-        <div class="section-head reveal">
-          <div>
-            <div class="section-kicker">02 / In the wild</div>
-            <h2 class="section-title">纸面之外</h2>
-          </div>
-          <a class="section-link" href="#/boards">打开画板 ${icon('arrow', 12)}</a>
-        </div>
-        <div class="gallery">
-          <figure class="gal-fig gal-a reveal-clip">
-            <div class="gal-wrap"><img src="assets/img/work-poster.webp" alt="城市文化节主视觉：混凝土墙上的朱红几何海报" data-par="0.04"></div>
-            <figcaption><span>01 / 城市文化节 · 主视觉</span><span>Poster series · 2025</span></figcaption>
-          </figure>
-          <figure class="gal-fig gal-b reveal-clip">
-            <div class="gal-wrap"><img src="assets/img/work-packaging.webp" alt="朱红压纹礼盒与烫金标签" data-par="0.08"></div>
-            <figcaption><span>02 / 明月 · 礼盒</span><span>Packaging · 2024</span></figcaption>
-          </figure>
-          <figure class="gal-fig gal-c reveal-clip">
-            <div class="gal-wrap"><img src="assets/img/work-brochure.webp" alt="摊开的画册，右侧为整页朱红" data-par="0.06"></div>
-            <figcaption><span>03 / 山茶研究所 · 画册</span><span>Editorial · 2025</span></figcaption>
-          </figure>
-          <div class="gal-note reveal">
-            「好的排版先解决<em>秩序</em>，再谈<em>风格</em>。
-            我做平面，也写前端，习惯用同一套网格处理纸与屏幕。」
-          </div>
+          <a class="hv-scroll" href="#signals" data-magnet="8">
+            Scroll to signal
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M12 4v15"/><path d="m6 13 6 6 6-6"/></svg>
+          </a>
         </div>
       </section>
 
-      <section class="section" id="feed">
-        <div class="section-head reveal">
+      <section class="hv-sec hv-signal" id="signals">
+        <header class="hv-sec-head">
           <div>
-            <div class="section-kicker">03 / Inspiration</div>
-            <h2 class="section-title">Midjourney 快照</h2>
+            <p class="hv-sec-kicker"><span>02</span> Live signal / 图流</p>
+            <h2 class="hv-sec-title">此刻的<em>颜色</em></h2>
           </div>
-          <p class="feed-head-note" id="feed-meta">正在读取快照…</p>
+          <div class="hv-feed-tools">
+            <span class="hv-feed-status" data-feed-status><i></i>正在连接图源…</span>
+            <button type="button" class="hv-btn" data-refresh data-magnet="10">换一批</button>
+          </div>
+        </header>
+        <div class="hv-rail" data-rail aria-label="图流，点击任意一张以取色">
+          ${[0, 1, 2, 3, 4, 5].map(i => cardSkeleton(i)).join('')}
         </div>
-        <div class="feed-grid" id="feed-grid">${feedCards(FALLBACK_FEED, MJ_FALLBACK)}</div>
-        <p class="feed-note" id="feed-note">
-          来源：Midjourney 公开广场（explore）。该站点由 Cloudflare 管理型质询保护，第三方站点抓取与图片热链均返回 403；
-          因此这里展示的是<strong>人工策展的提示词快照</strong>，不是实时流，也不冒充原图。具体刷新与限制见 README。
+        <p class="hv-feed-note" data-feed-note>
+          正在读取图源与许可信息…
         </p>
       </section>
 
-      <section class="section">
-        <div class="section-head reveal">
+      <section class="hv-sec" id="works">
+        <header class="hv-sec-head">
           <div>
-            <div class="section-kicker">04 / The desk</div>
-            <h2 class="section-title">工作台仍在</h2>
+            <p class="hv-sec-kicker"><span>03</span> Selected works</p>
+            <h2 class="hv-sec-title">作品选集</h2>
           </div>
-          <a class="section-link" href="#/projects">进入项目 ${icon('arrow', 12)}</a>
+          <a class="hv-btn" href="#/portfolio" data-magnet="10">全部作品 ${icon('arrow', 12)}</a>
+        </header>
+        <div class="hv-works-list">
+          ${featured.map((w, i) => `
+            <a class="hv-work hv-reveal" href="#/portfolio/${w.id}" data-preview="${coverOf(w)}" data-cursor="view" style="--i:${i}">
+              <span class="hv-work-i">${String(i + 1).padStart(2, '0')}</span>
+              <h3 class="hv-work-t">${escapeHtml(w.title)}</h3>
+              <span class="hv-work-m">${escapeHtml(w.section === 'code' ? 'CODE' : (w.category || 'DESIGN'))} / ${escapeHtml(w.role || '')}</span>
+              <span class="hv-work-y">${escapeHtml(w.year || '')}</span>
+              <span class="hv-work-a">↗</span>
+            </a>`).join('') || '<p class="hv-task-empty">还没有作品，去作品页添加第一件。</p>'}
         </div>
-        <div class="desk-grid">
-          <div class="reveal">
-            <div class="stats">
-              <div class="stat"><b>${activeProjects.length}</b><span>进行中的项目</span></div>
-              <div class="stat"><b>${focusMinutes}</b><span>本周专注 / 分钟</span></div>
-              <div class="stat"><b><span data-boards>${boardCount}</span></b><span>画板</span></div>
-              <div class="stat"><b>${works.length}</b><span>归档作品</span></div>
-              <div class="stat-note">
-                ${nextDeadline
-                  ? `最近截止：${escapeHtml(nextDeadline.title)} · ${escapeHtml(formatCN(nextDeadline.deadline))}`
-                  : '暂无临近截止的项目。'}
+        <div class="hv-work-preview" aria-hidden="true"><img alt=""></div>
+      </section>
+
+      <section class="hv-sec">
+        <header class="hv-sec-head">
+          <div>
+            <p class="hv-sec-kicker"><span>04</span> Beyond the sheet</p>
+            <h2 class="hv-sec-title">纸面<em>之外</em></h2>
+          </div>
+          <a class="hv-btn" href="#/boards" data-magnet="10">打开画板 ${icon('arrow', 12)}</a>
+        </header>
+        <div class="hv-stills">
+          ${STILLS.map((s, i) => `
+            <figure class="hv-still hv-still--${['a', 'b', 'c'][i]} hv-reveal">
+              <div class="hv-still-fig" data-depth="${[10, 20, 30][i]}">
+                <img src="${s.src}" alt="${escapeHtml(s.a)}" loading="lazy">
               </div>
+              <figcaption><span>${escapeHtml(s.a)}</span><span>${escapeHtml(s.b)}</span></figcaption>
+            </figure>`).join('')}
+          <p class="hv-quote hv-reveal">
+            「好的排版先解决<em>秩序</em>，再谈<em>风格</em>。
+            我做平面，也写前端，习惯用同一套网格处理纸与屏幕。」
+          </p>
+        </div>
+      </section>
+
+      <section class="hv-sec">
+        <header class="hv-sec-head">
+          <div>
+            <p class="hv-sec-kicker"><span>05</span> The desk</p>
+            <h2 class="hv-sec-title">工作台<em>仍在</em></h2>
+          </div>
+          <a class="hv-btn" href="#/projects" data-magnet="10">进入项目 ${icon('arrow', 12)}</a>
+        </header>
+        <div class="hv-desk">
+          <div>
+            <div class="hv-stat-grid">
+              <div class="hv-stat-cell"><b data-stat="projects">${activeProjects.length}</b><span>进行中的项目</span></div>
+              <div class="hv-stat-cell"><b data-stat="focus">${focusMinutes}</b><span>本周专注 / 分钟</span></div>
+              <div class="hv-stat-cell"><b data-stat="boards">${boardCount}</b><span>画板</span></div>
+              <div class="hv-stat-cell"><b data-stat="works">${works.length}</b><span>归档作品</span></div>
             </div>
-            <div class="desk-shortcuts">
-              <a href="#/boards">${icon('boards', 14)} 画板</a>
-              <a href="#/learn">${icon('learn', 14)} 学习</a>
-              <a href="#/library">${icon('library', 14)} 灵感库</a>
-              <a href="#/settings">${icon('settings', 14)} 设置</a>
-              <a href="#/portfolio">${icon('plus', 14)} 新增作品</a>
+            <p class="hv-desk-note">任务、项目与作品数据均保存在本机浏览器，不会上传服务器。</p>
+            <div class="hv-shortcuts">
+              <a class="hv-shortcut" href="#/boards">${icon('boards', 13)} 画板</a>
+              <a class="hv-shortcut" href="#/learn">${icon('learn', 13)} 学习</a>
+              <a class="hv-shortcut" href="#/library">${icon('library', 13)} 灵感库</a>
+              <a class="hv-shortcut" href="#/settings">${icon('settings', 13)} 设置</a>
+              <a class="hv-shortcut" href="#/portfolio">${icon('plus', 13)} 新增作品</a>
             </div>
           </div>
-          <div class="desk-tasks reveal">
-            <h3>Today / ${escapeHtml(formatCN(todayISO()))}</h3>
+          <div>
+            <div class="hv-tasks-head"><span>Today / ${escapeHtml(formatCN(todayISO()))}</span><b>${tasks.filter(t => t.done).length} / ${tasks.length}</b></div>
             ${tasks.length ? tasks.map(t => `
-              <div class="task-line ${t.done ? 'is-done' : ''}">
-                <span class="dot"></span><span class="t">${escapeHtml(t.title)}</span>
-              </div>`).join('') : '<p class="task-empty">今天还没有任务。去项目页拆一条吧。</p>'}
-            <p class="task-empty" style="margin-top:14px;font-size:11px;color:var(--ink-faint)">
-              任务、项目与作品数据均保存在本机浏览器，不会上传服务器。
-            </p>
+              <div class="hv-task ${t.done ? 'is-done' : ''}">
+                <i></i><span>${escapeHtml(t.title)}</span>
+              </div>`).join('') : '<p class="hv-task-empty">今天还没有任务。去项目页拆一条吧。</p>'}
           </div>
         </div>
       </section>
 
-      <footer class="site-foot">
-        <h2 class="foot-title reveal">Let’s make<br><em>something</em> worth printing.</h2>
-        <div class="foot-grid reveal">
-          <div class="foot-col">
+      <footer class="hv-foot">
+        <h2 class="hv-foot-title">Let’s make<br><em>something</em> worth printing.</h2>
+        <div class="hv-foot-grid">
+          <div class="hv-foot-col">
             <h4>Index</h4>
             <a href="#/portfolio">作品</a>
             <a href="#/projects">项目</a>
             <a href="#/boards">画板</a>
           </div>
-          <div class="foot-col">
+          <div class="hv-foot-col">
             <h4>Practice</h4>
             <a href="#/learn">学习记录</a>
             <a href="#/library">灵感库</a>
             <a href="#/settings">设置</a>
           </div>
-          <div class="foot-col">
+          <div class="hv-foot-col">
             <h4>Elsewhere</h4>
             <a href="https://github.com/Oro41n/designer-workbench" target="_blank" rel="noopener">GitHub ↗</a>
             ${state.profile.email ? `<a href="mailto:${escapeHtml(state.profile.email)}">${escapeHtml(state.profile.email)}</a>` : '<a href="#/settings">填写邮箱 ↗</a>'}
-            <a href="https://www.midjourney.com/explore" target="_blank" rel="noopener">Midjourney Explore ↗</a>
+            <a href="#/library">灵感链接 ↗</a>
           </div>
-          <div class="foot-col">
+          <div class="hv-foot-col">
             <h4>Status</h4>
             <p>${escapeHtml(state.profile.location || '远程 / 中国')}</p>
             <p>Open for work · 2026</p>
             <p>本地优先 / 无后端</p>
           </div>
         </div>
-        <div class="foot-baseline">
+        <div class="hv-foot-baseline">
           <span>© 2026 Oro — Design × Code</span>
-          <span>Native HTML / CSS / ES Modules</span>
+          <span>Native HTML / CSS / ES Modules + WebGL</span>
           <span>静态站点 · 数据留在本机</span>
         </div>
       </footer>`;
 
       hydrateImages?.(root);
-      if (feed) applyFeed(feed);
-      // 预览层挂到 body，避免固定定位被祖先 transform 影响
-      const pv = root.querySelector('.work-preview');
-      if (pv) {
-        document.querySelectorAll('body > .work-preview').forEach(el => el.remove());
-        document.body.appendChild(pv);
+      const preview = root.querySelector('.hv-work-preview');
+      if (preview) {
+        document.querySelectorAll('body > .hv-work-preview, body > .work-preview').forEach(el => el.remove());
+        document.body.appendChild(preview);
       }
+      paintSwatches(null);
       window.dispatchEvent(new CustomEvent('dw:view-rendered'));
     }
 
-    function tickerGroup() {
-      const items = ['Poster', 'Identity', 'Packaging', 'Editorial', 'Web', 'Motion'];
-      return items.map((t, i) => `<span><i>${String(i + 1).padStart(2, '0')}</i>${t}</span>`).join('');
+    function coverOf(work) {
+      if (work.imageId) return '';
+      if (work.sample && ART[work.category]) return ART[work.category];
+      return work.cover || ART[work.category] || 'assets/img/work-poster.webp';
     }
 
-    function feedCards(items, meta) {
-      const list = items.map((item, i) => `
-        <a class="feed-card" href="${escapeHtml(item.url || meta.sourceUrl)}" target="_blank" rel="noopener" style="--tone:${item.tone || 'rgba(255,75,43,.35)'}">
-          <div class="fc-top"><span>MJ / ${String(i + 1).padStart(2, '0')}</span><span>${escapeHtml(item.model || 'v6.1')}</span></div>
-          <div class="fc-prompt">${escapeHtml(item.prompt)}</div>
-          <div class="fc-foot"><span>${escapeHtml(item.author || 'community')}</span><span class="fc-link">explore ↗</span></div>
-        </a>`).join('');
-      return list || `<p class="task-empty">快照为空。</p>`;
+    function cardSkeleton(i) {
+      return `
+        <button type="button" class="hv-card" data-card="${i}" disabled>
+          <figure class="hv-card-fig">
+            <img alt="" loading="lazy">
+            <span class="hv-card-veil"></span>
+            <span class="hv-card-idx">${String(i + 1).padStart(2, '0')}</span>
+            <span class="hv-card-mark">当前主题</span>
+          </figure>
+          <span class="hv-card-meta"><b>读取中</b><span class="hv-card-dots"></span></span>
+        </button>`;
     }
 
-    function applyFeed(data) {
-      const grid = root.querySelector('#feed-grid');
-      const meta = root.querySelector('#feed-meta');
-      if (!grid || !meta) return;
-      const items = (data.items && data.items.length ? data.items : FALLBACK_FEED).map((it, i) => ({
-        ...it,
-        tone: it.tone || FALLBACK_FEED[i % FALLBACK_FEED.length].tone
-      }));
-      grid.innerHTML = feedCards(items, data);
-      const attempt = data.lastAttempt?.at ? `最后一次抓取尝试 ${data.lastAttempt.at}` : '抓取尝试：暂无记录';
-      meta.innerHTML = `<span class="chip"><i class="dot"></i>快照 · 非实时</span><br>
-        ${escapeHtml(data.source || 'Midjourney 公开广场')} ·
-        更新 ${escapeHtml(data.updatedAt || '—')} ·
-        ${escapeHtml(attempt)}`;
-      const note = root.querySelector('#feed-note');
-      if (note && data.lastAttempt?.status) {
-        note.innerHTML = `来源：<a href="${escapeHtml(data.sourceUrl)}" target="_blank" rel="noopener">Midjourney 公开广场（explore）</a>。
-          GitHub Actions 定时任务与本地直连均返回 HTTP ${escapeHtml(String(data.lastAttempt.status))}（Cloudflare 管理型质询），
-          图片 CDN 同样拒绝第三方引用。故本区为<strong>人工策展的提示词快照</strong>，不宣称实时；每条链接指向原站查看原图。
-          刷新机制与限制见 README。`;
+    /* ---------------- 图流 ---------------- */
+
+    function applyFeed() {
+      const meta = feed.meta;
+      const items = feed.items;
+      const rail = root.querySelector('[data-rail]');
+      const status = root.querySelector('[data-feed-status]');
+      const note = root.querySelector('[data-feed-note]');
+      if (!rail || !status || !note) return;
+
+      status.innerHTML = `<i></i>${escapeHtml(meta.source)} · ${meta.fallback ? '已降级' : '已连接'}`;
+      rail.innerHTML = items.map((it, i) => `
+        <button type="button" class="hv-card" data-card="${i}" data-cursor="theme"
+          title="${escapeHtml(it.title || '')} · ${escapeHtml(it.author || '')}">
+          <figure class="hv-card-fig">
+            <img src="${escapeHtml(it.src)}" data-fallback="${escapeHtml(it.fallbackSrc || '')}" alt="${escapeHtml(it.title || '图片流')}" loading="lazy">
+            <span class="hv-card-veil"></span>
+            <span class="hv-card-idx">${String(i + 1).padStart(2, '0')}</span>
+            <span class="hv-card-mark">当前主题</span>
+          </figure>
+          <span class="hv-card-meta">
+            <b>${escapeHtml(it.author || '')}</b>
+            <span class="hv-card-dots" data-dots="${i}"></span>
+          </span>
+        </button>`).join('');
+
+      rail.querySelectorAll('.hv-card').forEach(card => {
+        const img = card.querySelector('img');
+        img.addEventListener('error', () => {
+          if (img.dataset.fallback && img.src !== img.dataset.fallback) img.src = img.dataset.fallback;
+        });
+        card.addEventListener('click', () => selectCard(Number(card.dataset.card)));
+      });
+
+      const license = `<a href="${escapeHtml(meta.licenseUrl || '#')}" target="_blank" rel="noopener">${escapeHtml(meta.license || '')}</a>`;
+      const fetched = meta.fetchedAt ? meta.fetchedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+      note.innerHTML = `
+        <strong>图源：</strong><a href="${escapeHtml(meta.home || '#')}" target="_blank" rel="noopener">${escapeHtml(meta.source)}</a>
+        · 许可：${license}
+        · 本次拉取 ${fetched}
+        · ${escapeHtml(meta.refresh || '')}
+        ${meta.fallback ? `<br><span class="warn">当前显示的是站内备用图（${escapeHtml(meta.error || '网络不可用')}），配色仍来自图片本身，但不是实时图流。</span>` : ''}
+        ${meta.downgraded ? `<br><span class="warn">${escapeHtml(meta.downgraded)}</span>` : ''}
+        <br><strong>说明：</strong>${escapeHtml(meta.note || '')}
+        Midjourney 至今没有公开 API 或可授权抓取的图流，因此这里不展示「伪实时」的 MJ 内容。`;
+
+      // 首张图驱动主题
+      selectCard(0, { silent: true });
+
+      // 为每张卡片补取颜色，用于色点与点击后的即时切换
+      extractAll(items);
+      paintPlates(items);
+    }
+
+    function paintPlates(items) {
+      root.querySelectorAll('[data-plate]').forEach(img => {
+        const idx = Number(img.dataset.plate);
+        const it = items[idx] || items[0];
+        if (!it) return;
+        img.src = it.src;
+        img.closest('.hv-plate')?.classList.add('is-ready');
+      });
+    }
+
+    async function extractAll(items) {
+      palettes = new Array(items.length);
+      for (let i = 0; i < items.length; i++) {
+        if (destroyed) return;
+        const img = await loadBitmap(thumbOf(items[i].corsSrc), 5000);
+        if (!img) continue;
+        const clusters = extractPalette(img);
+        if (!clusters) continue;
+        palettes[i] = paletteFromClusters(clusters, currentColors().mode);
+        paintDots(i);
+        if (i === activeIndex) {
+          applyPalette(palettes[i]);
+          paintSwatches(palettes[i]);
+        }
       }
     }
 
-    async function loadFeed() {
-      try {
-        const res = await fetch('assets/data/mj-feed.json', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        feed = await res.json();
-      } catch (err) {
-        feed = MJ_FALLBACK;
+    function paintDots(i) {
+      const dots = root.querySelector(`[data-dots="${i}"]`);
+      if (!dots || !palettes[i]) return;
+      dots.innerHTML = palettes[i].swatches.slice(0, 4)
+        .map(hex => `<i style="background:${hex}"></i>`).join('');
+    }
+
+    async function selectCard(index, { silent = false } = {}) {
+      const items = feed?.items || [];
+      if (!items[index]) return;
+      activeIndex = index;
+      root.querySelectorAll('.hv-card').forEach(card => {
+        card.classList.toggle('is-active', Number(card.dataset.card) === index);
+      });
+
+      if (palettes[index]) {
+        applyPalette(palettes[index]);
+        paintSwatches(palettes[index]);
       }
-      if (!destroyed) applyFeed(feed);
+      const it = items[index];
+      const themeSource = root.querySelector('[data-theme-source]');
+      if (themeSource) {
+        themeSource.innerHTML = `<b>取自第 ${String(index + 1).padStart(2, '0')} 张</b><br>${escapeHtml(it.author || '')} · ${escapeHtml(it.license || feed.meta.license || '')}`;
+      }
+      if (silent) return;
+      // 点击后以原图重新取色，避免缩略图误差
+      const img = await loadBitmap(it.corsSrc, 7000);
+      if (!img || destroyed) return;
+      const result = await applyImagePalette(img);
+      if (!result.ok) {
+        const themeSourceEl = root.querySelector('[data-theme-source]');
+        if (themeSourceEl) themeSourceEl.innerHTML = `<b>取色失败</b><br>${escapeHtml(result.reason || '')}`;
+      }
+      paintSwatches(result.palette || palettes[index]);
+    }
+
+    function paintSwatches(palette) {
+      const box = root.querySelector('[data-swatches]');
+      const hex = root.querySelector('[data-hex]');
+      if (!box) return;
+      const c = currentColors();
+      const roles = palette?.bg
+        ? [palette.bg, palette.ink, palette.accent, palette.accent2]
+        : [c.bg, c.ink, c.accent, c.accent2];
+      box.innerHTML = roles.map(h => `<i class="hv-swatch" style="background:${h}" title="${h}"></i>`).join('');
+      if (hex) {
+        hex.innerHTML = `<span>BG ${roles[0].toUpperCase()} · INK ${roles[1].toUpperCase()}</span><span>ACC ${roles[2].toUpperCase()} · ACC2 ${roles[3].toUpperCase()}</span>`;
+      }
+    }
+
+    /* ---------------- 外壳交互 ---------------- */
+
+    function bindChrome() {
+      field = createInkField(root.querySelector('[data-field]'));
+
+      const clock = root.querySelector('[data-clock]');
+      const tick = () => {
+        if (clock) clock.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      };
+      tick();
+      clockTimer = setInterval(tick, 1000);
+
+      root.querySelector('[data-refresh]')?.addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = '拉取中…';
+        try {
+          const data = await loadFeed();
+          if (destroyed) return;
+          feed = data;
+          applyFeed();
+          btn.textContent = '换一批';
+        } catch (err) {
+          btn.textContent = '失败，重试';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // 首屏文字遮罩揭示
+      requestAnimationFrame(() => root.querySelector('.hv-hero')?.classList.add('is-in'));
+
+      // 章节揭示
+      if ('IntersectionObserver' in window && !reducedMotion()) {
+        const io = new IntersectionObserver(entries => {
+          entries.forEach(en => {
+            if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); }
+          });
+        }, { threshold: 0.15, rootMargin: '0px 0px -6%' });
+        root.querySelectorAll('.hv-reveal').forEach(el => io.observe(el));
+        cleanups.push(() => io.disconnect());
+      } else {
+        root.querySelectorAll('.hv-reveal').forEach(el => el.classList.add('is-in'));
+      }
+    }
+
+    function bindMotion() {
+      if (reducedMotion()) return;
+      const plates = [...root.querySelectorAll('[data-depth]')];
+      if (!plates.length) return;
+      let nx = 0, ny = 0, tx = 0, ty = 0, sp = 0, running = true;
+      const loop = () => {
+        if (!running) return;
+        nx += (tx - nx) * 0.07;
+        ny += (ty - ny) * 0.07;
+        const vh = window.innerHeight;
+        sp = Math.min(1, Math.max(0, window.scrollY / vh));
+        plates.forEach(el => {
+          const d = Number(el.dataset.depth) || 10;
+          const y = -ny * d + sp * d * 1.5;
+          el.style.transform = `translate3d(${(-nx * d).toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
+        });
+        raf = requestAnimationFrame(loop);
+      };
+      const onPointer = e => {
+        tx = (e.clientX / Math.max(1, window.innerWidth) - 0.5) * 2;
+        ty = (e.clientY / Math.max(1, window.innerHeight) - 0.5) * 2;
+      };
+      window.addEventListener('pointermove', onPointer, { passive: true });
+      cleanups.push(() => { running = false; window.removeEventListener('pointermove', onPointer); });
+      raf = requestAnimationFrame(loop);
+
+      // 磁性元素
+      root.querySelectorAll('[data-magnet]').forEach(el => {
+        const strength = Number(el.dataset.magnet) || 8;
+        const onMove = e => {
+          const rect = el.getBoundingClientRect();
+          const dx = (e.clientX - (rect.left + rect.width / 2)) / rect.width * strength;
+          const dy = (e.clientY - (rect.top + rect.height / 2)) / rect.height * strength;
+          el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0)`;
+        };
+        const onLeave = () => { el.style.transform = ''; };
+        el.addEventListener('pointermove', onMove);
+        el.addEventListener('pointerleave', onLeave);
+        cleanups.push(() => {
+          el.removeEventListener('pointermove', onMove);
+          el.removeEventListener('pointerleave', onLeave);
+        });
+      });
+    }
+
+    function refreshStats() {
+      const state = getState();
+      const week = weekDates();
+      const focusMinutes = state.focusSessions.filter(s => s.date && week.includes(s.date)).reduce((n, s) => n + (s.minutes || 0), 0);
+      const set = (key, val) => {
+        const el = root.querySelector(`[data-stat="${key}"]`);
+        if (el) el.textContent = String(val);
+      };
+      set('projects', state.projects.filter(p => p.status !== '交付').length);
+      set('focus', focusMinutes);
+      set('works', state.portfolio.length);
+      set('boards', boardCount);
     }
   }
 };
