@@ -3,17 +3,18 @@
 一个面向平面设计师的个人工作台：项目看板、作品集（设计 + 编程）、学习打卡、灵感素材库、番茄钟，以及内置的印前画板工具（类 Figma Lite：无限画布、图层、属性、PNG / SVG 导出）。纯静态站点，原生 HTML / CSS / ES Modules，无构建、无外部 CDN，数据保存在本机浏览器。
 
 - 入口：[`index.html`](index.html)
+- 线上地址：[https://oro41n.github.io/designer-workbench/](https://oro41n.github.io/designer-workbench/)（GitHub Pages，`main` 分支根目录）
 - 设计概念：**Living Press / 活的印刷机**（v3）——程序化 WebGL 流体影像层 + 由图片主色驱动的全站主题 + 多层影像拼贴 + 遮罩文字揭示。首屏不是静态大图模板：噪声场由时间与指针驱动缓慢呼吸，色相来自当前图流的第一张图。
 - 主题：4 个基色（`--bg` / `--ink` / `--accent` / `--accent-2`）由 Canvas 从图片像素提取（40×40 采样 + 5 簇 k-means），并映射为全站的背景 / 文字 / 强调 / 渐变 / 描边；换图时以 900ms 缓动插值过渡，深色与浅色模式都重新计算。每次刷新页面都会重新拉图、重新取色。
 - 动效与交互：页面幕布转场、文字遮罩逐行揭示、影像拼贴随光标与滚动分层视差（`data-depth`）、磁性按钮（`data-magnet`）、悬停位移、作品行悬浮大图、自定义光标「VIEW / THEME」。全部遵循 `prefers-reduced-motion`（降级为静态帧）。
-- 状态：v3 首页已上线；作品 / 项目 / 画板 / 学习 / 灵感 / 设置六个内页仍沿用 v2 皮肤，正在按 v3 令牌迁移，功能与本地数据保持兼容。
+- 状态：v3 已完成。首页与六个内页（作品 / 项目 / 画板 / 学习 / 灵感 / 设置）使用同一套 v3 令牌；旧的 `site.css`、`views.css` 已删除，样式集中在 `v3.css`（外壳 + 首页）与 `pages-v3.css`（内页），`app.css` 只保留画板编辑器与基础重置。功能与 `localStorage` / IndexedDB 数据保持兼容，无需迁移。
 - 适配：1600 / 1180 / 1000 / 860 / 640 / 390 六档；移动端底部导航，页面无横向滚动。
 
 ## 功能
 
 | 模块 | 内容 |
 | --- | --- |
-| 工作台 `#/home` | 整屏影像首屏（视差）、跑马灯、作品索引（悬停大图预览）、精选画廊、Midjourney 灵感快照、工作台统计、页脚；不再使用 Bento 卡片面板 |
+| 工作台 `#/home` | 程序化影像首屏（WebGL 流体层 + 影像拼贴视差）、「此刻的颜色」图流（换一批 / 逐张取色）、作品索引（悬停大图）、工作台统计与页脚 |
 | 画板架 `#/boards` | 缩略图墙、搜索、示例画板、新建（A4 300dpi / 1080×1080 / 1920×1080 / 1080×1920 / 自定义）、重命名、复制、删除 |
 | 画板编辑器 `#/board/:id` | 无限画布、画框、矩形 / 椭圆 / 直线 / 文字 / 图片、图层、属性面板、对齐吸附、撤销重做、保存与导出（详见下文） |
 | 项目看板 `#/projects` | 新增 / 编辑 / 删除；客户、类型、状态、截止日期、进度、改稿次数、模板来源、备注、标签；四列看板 / 列表切换；搜索、类型筛选、状态筛选、逾期朱红高亮 |
@@ -31,12 +32,14 @@
 | 项 | 说明 |
 | --- | --- |
 | 默认源 | Lorem Picsum（`https://picsum.photos`，随机图片服务，图片来自 Unsplash，遵循 [Unsplash License](https://unsplash.com/license)） |
-| 其它源 | Unsplash（需免费 Access Key）、Pexels（需免费 API Key）、Openverse（CC，无需 Key）。全部通过 `assets/js/feed/adapters.js` 实现 |
+| 其它源 | Unsplash（需免费 Access Key）、Pexels（需免费 API Key）、Openverse（CC，无需 Key）。全部通过 `assets/js/feed/adapters.js` 实现；仓库不带任何 Key，未填写时视为未接入 |
 | 切换方式 | 改 `assets/js/feed/config.js` 的 `source` / `keys`，或在设置页写入 `localStorage['dw.feed.v1']`；不写代码即可换源 |
 | 刷新机制 | 每次页面加载生成新的随机种子（Picsum）或请求 `/photos/random`（Unsplash），不缓存历史结果；「换一批」按钮立即重新拉取 |
-| 取色 | 图片经 CORS 代理读取像素 → 40×40 缩略 → 5 簇 k-means → 映射 `--bg` / `--ink` / `--accent` / `--accent-2` → 900ms 插值过渡。取色失败时回退品牌色并在面板标注原因 |
+| 取色 | 图片经 CORS 代理读取像素 → 40×40 缩略 → 5 簇 k-means → 映射 `--bg` / `--ink` / `--accent` / `--accent-2` → 900ms 插值过渡；同一组颜色通过 `dw:palette` 事件驱动首屏 WebGL 着色器，深 / 浅模式各自重算。取色失败时回退品牌色并在面板标注原因 |
 | 许可与署名 | 卡片与说明区展示来源、许可链接与作者；Unsplash / Pexels 适配器按各自 API 指南附带作者主页与 `utm` 链接 |
-| 限制 | Picsum 的 `v2/list` 接口未返回 CORS 头，因此不使用其作者元数据（卡片署名为「Lorem Picsum / Unsplash」）；`images.weserv.nl` 仅作为读取像素的代理，图片展示仍直连原站；本机网络访问 `api.openverse.org` 超时（地区性限制），Openverse 失败会自动降级到 Picsum；网络完全不可用时显示站内备用图并明确标注「非实时」 |
+| 限制 | Picsum 的 `v2/list` 接口未返回 CORS 头，因此不使用其作者元数据（卡片署名为「Lorem Picsum / Unsplash」）；`images.weserv.nl` 仅作为读取像素的代理，图片展示仍直连原站；本机（中国内地网络）实测 `api.openverse.org` 连接超时，Openverse 适配器虽已写好但默认不启用，失败会自动降级到 Picsum；网络完全不可用时显示站内备用图并明确标注「非实时」 |
+
+> 密钥策略：仓库与提交历史中没有任何 API Key。Unsplash / Pexels 只有在 `assets/js/feed/config.js` 的 `FEED_CONFIG.keys`（或 `localStorage['dw.feed.v1']`）填入你自己的 Key 后才会发起请求；未配置时页面仍使用 Picsum，不会声称已接入 Unsplash / Pexels。
 
 > 说明：`images.weserv.nl` 是第三方图片代理，用于绕过 CORS 读取像素；如果代理不可用，图片仍能显示，但取色会失败并回退默认色板。
 
@@ -100,9 +103,9 @@
 ```text
 index.html                 入口（新外壳：顶栏、幕布、光标、滚动进度、内页页脚）
 assets/
-  css/site.css             新视觉系统：设计令牌、外壳、首页、动效、移动端底部导航
-  css/views.css            六个内页的视觉迁移覆盖层（作品 / 项目 / 画板 / 学习 / 灵感 / 设置）
-  css/app.css              旧版样式与画板编辑器（保留以兼容编辑器与既有组件）
+  css/v3.css               v3 外壳与首页：令牌、顶栏、光标 / 幕布、WebGL 首屏、图流、页脚
+  css/pages-v3.css         六个内页（作品 / 项目 / 画板 / 学习 / 灵感 / 设置）+ 弹层 / Toast
+  css/app.css              基础重置与画板编辑器（仅编辑器仍使用其舞台配色）
   js/app.js                路由（hash）、外壳渲染、幕布转场、视差 / 揭示 / 光标、全局交互
   js/store.js              localStorage 状态、示例数据、导出 / 导入 / 清空
   js/images.js             IndexedDB 图片压缩、存取、导入导出与 hydrate
@@ -193,15 +196,15 @@ python -m http.server 4173
 2. 打开「作品集」→「新增作品」。封面用本机图片上传，自动压缩；也可以先在 `assets/covers/` 放自己的图，再把 `cover` 字段指向该路径。
 3. 新作品默认 `sample: false`；示例作品可在「设置」里点「清除示例数据」一次性移除，或逐条删除。
 4. 联系方式默认留空，是否公开由你决定；站内不会上传任何数据。
-5. 新视觉的公开展示图在 [`assets/img/`](assets/img/)（WebP），示例作品封面在 `store.js` 的 `designCover()` 中映射；换成自己的作品时优先用作品集里的封面上传。主题强调色在新系统令牌 [`assets/css/site.css`](assets/css/site.css) 顶部修改（深色 `--accent: #ff4b2b`，浅色 `#cf3418`）；编辑器相关令牌仍由 `app.css` 提供。
+5. 新视觉的公开展示图在 [`assets/img/`](assets/img/)（WebP），示例作品封面在 `store.js` 的 `designCover()` 中映射；换成自己的作品时优先用作品集里的封面上传。强调色不是写死的：运行时由图流第一张图取色写入 `--bg` / `--ink` / `--accent` / `--accent-2`；想固定品牌色，改 [`assets/css/v3.css`](assets/css/v3.css) 顶部 `:root` 的兜底值（深色 `--accent: #ff4b2b`，浅色 `#cf3418`），并把 `theme-engine.js` 的自动取色关掉即可。内页样式在 [`assets/css/pages-v3.css`](assets/css/pages-v3.css)，编辑器相关令牌仍由 `app.css` 提供。
 
 ## 验证与性能
 
-- 新版内页（2026-11-06）：Edge / Playwright 在 1600×900 与 390×844 下遍历作品、项目、画板、学习、灵感、设置六页，均无横向滚动、控制台 0 报错；作品详情弹层、项目新建弹层、看板 / 列表切换（7 行）、学习记录弹层、收藏网址弹层、浅色主题切换、命令面板与 `/` 搜索全部通过；画板编辑器仍为全屏 900px（隐藏新顶栏，画布 818px）。
+- v3 内页迁移（2026-11-06）：Edge / Playwright 在 1600×900 与 390×844 下遍历作品、项目、画板、学习、灵感、设置六页，均无横向滚动、控制台 / 页面 0 报错；页头标题与面板标题均为 v3 衬线字体，正文背景等于取色得到的 `--bg`。抽检通过：作品设计 / 编程分区切换、作品详情弹层、项目看板 / 列表切换（7 行）、浅色主题切换（设置页背景 `rgb(235,238,242)`）、命令面板（23 条动作）、画板编辑器（隐藏顶栏，画布 1230×818）、移动端底栏（`position: fixed`，页面底部留白 84px 不被遮挡）。
 - 使用 Edge（Playwright，Chromium 内核，1600×900）实跑画板全流程：新建 1080×1350 画板 → 矩形 / 文字 / 上传图片 → 拖动、8 点缩放、旋转 → 改填充 / 描边 → 图层排序 → 撤销 / 重做 → 自动保存 → 刷新恢复（3 个对象 + 4 行图层）→ 导出 PNG 2x（2160×2700，349,637 字节）→ 导出 SVG（17,174 字节，含 `<text>` 节点）。命令面板 `⌘K` 搜索「画板」返回 4 条结果，首项为「新建画板」；深浅主题、390×844 三页均无横向滚动（`scrollWidth = clientWidth = 390`），控制台与页面错误均为 0。
 - 性能：在编辑器中构造 123 个对象，连续 12 帧 Canvas 绘制平均 **0.65 ms**、最大 **4.4 ms**（约 60fps 预算内；不含历史快照与自动保存的序列化开销）。缩放 / 拖动 / 吸附均通过 `requestAnimationFrame` 合并重绘，图片使用离屏 `Image` 缓存。
-- 截图见 [`screenshots/`](screenshots/)：新版首页（深色 / 浅色 / 移动端 / 悬停预览）、六个内页桌面与移动端（`inner-desktop-*` / `inner-mobile-*`）、作品详情弹层、项目列表、设置浅色、画板编辑器、命令面板与搜索。
-- 体积（未压缩）：HTML 3.2 KB，CSS 154.8 KB，JS 267.1 KB；无外部字体与 CDN 请求。首屏影像为 WebP，示例 SVG 仅作兜底。
+- 截图见 [`screenshots/`](screenshots/)：首页桌面 / 浅色 / 移动端（`v3-desktop-*`、`v3-mobile-*`），六个内页桌面（`v3-inner-desktop-*`）与移动端（`v3-inner-mobile-*`），作品详情弹层、项目列表视图、设置浅色、画板编辑器。
+- 体积（未压缩）：HTML 3.2 KB，CSS 185.0 KB（`app.css` 108.2 / `pages-v3.css` 43.4 / `v3.css` 33.4），JS 303.1 KB；无外部字体与 CDN 请求。首屏影像为 WebP，示例 SVG 仅作兜底。
 
 ## 已知限制与未实现
 
@@ -212,6 +215,6 @@ python -m http.server 4173
 - 移动端可查看画板、选择对象与简单拖动，复杂编辑会提示「建议桌面端」；不支持多点触控双指缩放。
 - 筛选与视图状态未写入 URL（路由只记录页面与项目 / 作品 / 画板 id）；刷新后筛选会回到默认。
 - 示例作品是抽象几何封面，不代表真实项目；示例项目 / 学习记录 / 示例画板同样带「示例」标记。
-- **Midjourney 区块是人工策展快照，不是实时数据**：广场页 / API / CDN 均有 403 或 401 限制，静态 Pages 无法抓取或热链；页面已如实标注「快照 · 非实时」、快照日期与最后抓取 403。换用支持 API 的图库后再替换数据源与刷新策略。
-- 六个内页通过 `views.css` 覆盖旧样式实现迁移；画板编辑器仍使用 `app.css` 的舞台配色与组件，不与新外壳共用全部令牌。
+- **Midjourney 没有可接入的公开图流**：广场页 / API / CDN 均为 403 或 401，静态 Pages 无法抓取或热链；v3 首页不接入 MJ，改用 Picsum 等公开图库并真实取色。`assets/data/mj-feed.json` 只是 v2 的人工策展快照（非实时），页面不再展示。
+- 六个内页由 [`assets/css/pages-v3.css`](assets/css/pages-v3.css) 统一覆盖：旧的 `site.css` / `views.css` 已删除，`app.css` 只保留基础重置与画板编辑器；编辑器仍使用自身的舞台配色，不与新外壳共用全部令牌。
 - 仓库默认公开、联系方式默认留空、强调色默认朱红，均可按需调整。
