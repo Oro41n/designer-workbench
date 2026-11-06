@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F4F0E7">
-  <meta name="description" content="Oro 设计工作台：项目看板、作品集、学习打卡、灵感库与番茄钟，数据保存在本地。">
-  <title>Oro 设计工作台</title>
+  <meta name="theme-color" content="#EFE9DB">
+  <meta name="description" content="Oro 印前工作台：带无限画板的项目看板、作品集、学习打卡、灵感库与番茄钟，数据保存在本地。">
+  <title>Oro 印前工作台</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/app.css">
 </head>
@@ -16,8 +16,16 @@
   <div class="app-shell">
     <aside class="sidebar" aria-label="主导航">
       <div class="brand">
-        <a class="brand-mark" href="#/home" aria-label="ORO 设计工作台">ORO<span class="brand-dot">.</span></a>
-        <p class="brand-sub">设计工作台 / Workbench</p>
+        <a class="brand-lockup" href="#/home" aria-label="ORO 印前工作台">
+          <svg class="brand-glyph" viewBox="0 0 48 48" aria-hidden="true">
+            <circle cx="24" cy="24" r="10.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
+            <circle cx="24" cy="24" r="3" fill="currentColor"/>
+            <path d="M24 1.5v11M24 35.5v11M1.5 24h11M35.5 24h11" stroke="currentColor" stroke-width="1.1"/>
+            <path d="M6 6h7M6 6v7M42 6h-7M42 6v7M6 42h7M6 42v-7M42 42h-7M42 42v-7" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          <span class="brand-word">ORO<span class="brand-dot">.</span></span>
+        </a>
+        <p class="brand-sub">Print studio / 印前工作台</p>
       </div>
       <nav class="nav" id="side-nav" aria-label="页面导航"></nav>
       <div class="sidebar-foot">
@@ -46,17 +54,23 @@
       <header class="topbar">
         <div class="topbar-inner">
           <div class="topbar-left">
-            <a class="mobile-brand" href="#/home" aria-label="ORO 设计工作台">ORO.</a>
+            <a class="mobile-brand" href="#/home" aria-label="ORO 印前工作台">ORO.</a>
             <span class="topbar-section" id="topbar-section">工作台</span>
           <span class="topbar-date" id="topbar-date"></span>
           </div>
           <div class="topbar-actions">
-            <button type="button" class="search-btn" id="search-open" aria-label="搜索（快捷键 /）">
+            <button type="button" class="search-btn palette-btn" id="palette-open" aria-label="命令面板（快捷键 Command K）">
+              <span class="search-btn-icon" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 6.5a2.5 2.5 0 1 0-2.5 2.5H9V6.5z"/><path d="M15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5z"/><path d="M9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5z"/><path d="M15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5z"/></svg>
+              </span>
+              <span class="search-btn-text">命令</span>
+              <kbd>⌘K</kbd>
+            </button>
+            <button type="button" class="search-btn search-btn--icon" id="search-open" aria-label="搜索（快捷键 /）" title="搜索 /">
               <span class="search-btn-icon" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
               </span>
-              <span class="search-btn-text">搜索</span>
-              <kbd>/</kbd>
+              <span class="sr-only">搜索</span>
             </button>
             <span class="save-status" id="save-status" aria-live="polite">已保存</span>
             <a class="avatar avatar--top" href="#/settings" id="top-avatar" aria-label="打开设置"><span id="top-avatar-inner">我</span></a>

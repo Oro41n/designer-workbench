@@ -5,8 +5,11 @@ import { todayISO, formatCN } from './util.js';
 import { getImageURL, hydrateImages } from './images.js';
 import { subscribeTimer, timeText } from './pomodoro.js';
 import { openSearch } from './search.js';
+import { openPalette } from './palette.js';
 import home from './views/home.js';
 import projects from './views/projects.js';
+import boards from './views/boards.js';
+import board from './views/board.js';
 import portfolio from './views/portfolio.js';
 import learn from './views/learn.js';
 import library from './views/library.js';
@@ -15,14 +18,15 @@ import settings from './views/settings.js';
 const NAV = [
   { route: 'home', label: '工作台', en: 'Desk', icon: 'home' },
   { route: 'projects', label: '项目看板', en: 'Projects', icon: 'projects' },
+  { route: 'boards', label: '画板', en: 'Press', icon: 'boards' },
   { route: 'portfolio', label: '作品集', en: 'Portfolio', icon: 'portfolio' },
   { route: 'learn', label: '学习区', en: 'Learn', icon: 'learn' },
   { route: 'library', label: '灵感库', en: 'Library', icon: 'library' },
   { route: 'settings', label: '设置', en: 'Settings', icon: 'settings' }
 ];
 
-const VIEWS = { home, projects, portfolio, learn, library, settings };
-const BASE_TITLE = 'Oro 设计工作台';
+const VIEWS = { home, projects, boards, board, portfolio, learn, library, settings };
+const BASE_TITLE = 'Oro 印前工作台';
 
 let viewEl = document.getElementById('view');
 let currentView = null;
@@ -98,15 +102,16 @@ function parseHash() {
 }
 
 function updateNav(route) {
+  const navKey = route === 'board' ? 'boards' : route;
   document.querySelectorAll('.nav-item, .mnav-item').forEach(a => {
-    const active = a.dataset.route === route;
+    const active = a.dataset.route === navKey;
     a.classList.toggle('is-active', active);
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
-  const meta = NAV.find(n => n.route === route) || NAV[0];
+  const meta = NAV.find(n => n.route === navKey) || NAV[0];
   const section = document.getElementById('topbar-section');
-  if (section) section.textContent = meta.label;
+  if (section) section.textContent = route === 'board' ? '画板编辑器' : meta.label;
 }
 
 function renderRoute() {
@@ -123,9 +128,11 @@ function renderRoute() {
   viewEl.replaceWith(fresh);
   viewEl = fresh;
   currentRoute = route;
+  document.body.classList.toggle('is-editor', route === 'board');
   currentView = VIEWS[route].mount(viewEl, { param });
   updateNav(route);
-  document.title = `${NAV.find(n => n.route === route)?.label || '工作台'} · ${BASE_TITLE}`;
+  const titleLabel = route === 'board' ? '画板' : (NAV.find(n => n.route === route)?.label || '工作台');
+  document.title = `${titleLabel} · ${BASE_TITLE}`;
   if (route !== 'home') window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   hydrateImages(viewEl);
 }
@@ -141,6 +148,9 @@ function bindGlobal() {
 
   document.getElementById('search-open').addEventListener('click', openSearch);
 
+  const paletteBtn = document.getElementById('palette-open');
+  if (paletteBtn) paletteBtn.addEventListener('click', openPalette);
+
   document.getElementById('theme-toggle').addEventListener('click', () => {
     const next = getState().theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
@@ -153,9 +163,13 @@ function bindGlobal() {
     const typing = target instanceof HTMLElement && (
       target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable
     );
-    if (e.key === '/' && !typing) {
+    if (e.key === '/' && !typing && !document.body.classList.contains('is-editor')) {
       e.preventDefault();
       openSearch();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openPalette();
     }
   });
 

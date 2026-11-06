@@ -118,8 +118,7 @@ export function debounce(fn, wait = 300) {
   };
 }
 
-export function downloadFile(filename, text, type = 'application/json') {
-  const blob = new Blob([text], { type });
+export function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -127,7 +126,20 @@ export function downloadFile(filename, text, type = 'application/json') {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+export function downloadFile(filename, text, type = 'application/json') {
+  downloadBlob(filename, new Blob([text], { type }));
+}
+
+export function timeAgo(ts) {
+  const diff = Math.max(0, Date.now() - (Number(ts) || 0));
+  if (diff < 60e3) return '刚刚';
+  if (diff < 3600e3) return `${Math.floor(diff / 60e3)} 分钟前`;
+  if (diff < 86400e3) return `${Math.floor(diff / 3600e3)} 小时前`;
+  const d = new Date(Number(ts));
+  return `${d.getMonth() + 1} 月 ${d.getDate()} 日`;
 }
 
 export function bytesText(n) {

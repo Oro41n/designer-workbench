@@ -31,7 +31,32 @@ const paths = {
   more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
   mail: '<rect x="3.5" y="5.5" width="17" height="13"/><path d="m4 6 8 6 8-6"/>',
   pin: '<path d="M12 21s6-5.5 6-10a6 6 0 1 0-12 0c0 4.5 6 10 6 10z"/><circle cx="12" cy="11" r="2.4"/>',
-  folder: '<path d="M3.5 6.5h6l2 2h9v11h-17z"/>'
+  folder: '<path d="M3.5 6.5h6l2 2h9v11h-17z"/>',
+  boards: '<path d="M4 8V4h4"/><path d="M16 4h4v4"/><path d="M20 16v4h-4"/><path d="M8 20H4v-4"/><rect x="8" y="8" width="8" height="8"/>',
+  ruler: '<path d="M3 16 16 3l5 5L8 21z"/><path d="m7 12 2 2"/><path d="m10 9 2 2"/><path d="m13 6 2 2"/>',
+  layers: '<path d="M12 3 21 8l-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/>',
+  undo: '<path d="M4 9h11a5 5 0 0 1 0 10H9"/><path d="m8 5-4 4 4 4"/>',
+  redo: '<path d="M20 9H9a5 5 0 0 0 0 10h6"/><path d="m16 5 4 4-4 4"/>',
+  zoomIn: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/><path d="M10.5 8v5"/><path d="M8 10.5h5"/>',
+  zoomOut: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/><path d="M8 10.5h5"/>',
+  fit: '<path d="M4 9V4h5"/><path d="M15 4h5v5"/><path d="M20 15v5h-5"/><path d="M9 20H4v-5"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/>',
+  eyeOff: '<path d="M4 4l16 16"/><path d="M9.5 6.2A11 11 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a19 19 0 0 1-3.3 4"/><path d="M6.4 8.2A18 18 0 0 0 2.5 12S6 18.5 12 18.5a11 11 0 0 0 4.2-.9"/><path d="M10 10a2.8 2.8 0 0 0 4 4"/>',
+  lock: '<rect x="5.5" y="10.5" width="13" height="9" rx="1"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5"/>',
+  unlock: '<rect x="5.5" y="10.5" width="13" height="9" rx="1"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0"/>',
+  image: '<rect x="3.5" y="4.5" width="17" height="15"/><path d="m3.5 15 4.5-4 4 3.5 3-2.5 5 4.5"/><circle cx="8.5" cy="9" r="1.4"/>',
+  text: '<path d="M5 5h14"/><path d="M12 5v14"/><path d="M9 19h6"/>',
+  rect: '<rect x="4" y="5" width="16" height="14"/>',
+  ellipse: '<ellipse cx="12" cy="12" rx="8" ry="6.5"/>',
+  line: '<path d="M4 19 19 5"/><circle cx="4" cy="19" r="1.4"/><circle cx="19" cy="5" r="1.4"/>',
+  hand: '<path d="M8 12V6.5a1.7 1.7 0 0 1 3.4 0V11"/><path d="M11.4 11V5.2a1.7 1.7 0 0 1 3.4 0v6"/><path d="M14.8 11.4V6.8a1.7 1.7 0 0 1 3.4 0v6.6c0 4-2.6 7-6.6 7h-.6a6 6 0 0 1-4.7-2.3L4 13.4a1.8 1.8 0 0 1 2.7-2.4l1.9 2"/>',
+  cursor: '<path d="M6 3.5 18.5 12 12.6 13.6 10 19.6z"/>',
+  export: '<path d="M12 3v11"/><path d="m8.5 10.5 3.5 3.5 3.5-3.5"/><path d="M4 15v5h16v-5"/>',
+  front: '<rect x="7" y="7" width="10" height="10"/><path d="M4 4h9v3"/><path d="M17 20h3v-3"/>',
+  back: '<rect x="7" y="7" width="10" height="10"/><path d="M4 7V4h3"/><path d="M20 17v3h-3"/>',
+  up: '<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>',
+  down: '<path d="M12 5v14"/><path d="m6 13 6 6 6-6"/>',
+  command: '<path d="M9 6.5a2.5 2.5 0 1 0-2.5 2.5H9V6.5z"/><path d="M15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5z"/><path d="M9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5z"/><path d="M15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5z"/><rect x="9" y="9" width="6" height="6"/>'
 };
 
 export function icon(name, size = 18, cls = '') {

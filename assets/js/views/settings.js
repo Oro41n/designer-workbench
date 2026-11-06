@@ -3,7 +3,8 @@ import { getState, subscribe, update, setTheme, exportData, replaceState, clearS
 import { icon } from '../icons.js';
 import { pageHead, toast, confirmDialog, dangerDialog, formValues } from '../ui.js';
 import { escapeHtml, downloadFile, todayISO, bytesText } from '../util.js';
-import { saveImage, deleteImage, getImageURL, countImages, exportImages, importImages, hydrateImages } from '../images.js';
+import { saveImage, deleteImage, countImages, exportImages, importImages, hydrateImages } from '../images.js';
+import { countBoards, exportBoards, importBoards, clearBoards, deleteSampleBoards } from '../boards.js';
 
 export default {
   mount(root) {
@@ -89,7 +90,7 @@ export default {
                   <span class="theme-label">${icon('moon', 15)} 深色 · 墨黑</span>
                 </button>
               </div>
-              <p class="panel-hint">强调色为朱红 #C8452D，两个主题共用。</p>
+              <p class="panel-hint">强调色为墨红 #A9331F（深色主题 #E56B45），纸张与墨色随主题切换。</p>
             </section>
 
             <section class="panel data-panel" aria-labelledby="data-title">
@@ -106,8 +107,9 @@ export default {
                 <div><span>项目</span><b>${state.projects.length}</b></div>
                 <div><span>作品</span><b>${state.portfolio.length}</b></div>
                 <div><span>学习记录</span><b>${state.learn.records.length}</b></div>
+                <div><span>画板</span><b data-board-count>…</b></div>
                 <div><span>数据体积</span><b>${bytesText(storageBytes())}</b></div>
-                <div><span>封面图片</span><b data-image-count>…</b></div>
+                <div><span>图片</span><b data-image-count>…</b></div>
               </div>
               <div class="danger-zone">
                 <p class="danger-title">清理数据</p>
@@ -124,14 +126,14 @@ export default {
         <section class="panel about-panel" aria-labelledby="about-title">
           <div class="panel-head">
             <div><p class="kicker">About / 关于</p><h2 id="about-title">关于这个工作台</h2></div>
-            <span class="chip chip--tiny">v1.0</span>
+            <span class="chip chip--tiny">v1.1</span>
           </div>
           <div class="about-grid">
-            <p>纯静态站点：原生 HTML / CSS / ES Modules，无构建、无外部 CDN。项目、作品、学习与收藏数据存在 <code>localStorage</code>；封面与头像存在 <code>IndexedDB</code>（长边压缩到 ≤ 1600px）。</p>
+            <p>纯静态站点：原生 HTML / CSS / ES Modules，无构建、无外部 CDN。项目、作品、学习与收藏数据存在 <code>localStorage</code>；每张画板的对象树独立存在 <code>IndexedDB</code>，图片长边压缩到 ≤ 1600px。</p>
             <dl class="about-facts">
-              <div><dt>主题</dt><dd>暖白纸感 / 墨黑，朱红强调</dd></div>
+              <div><dt>主题</dt><dd>纸白 / 墨黑，墨红强调，WCAG AA</dd></div>
               <div><dt>字体</dt><dd>中文系统字体栈，不请求境外字体</dd></div>
-              <div><dt>快捷键</dt><dd><kbd>/</kbd> 搜索 · <kbd>Esc</kbd> 关闭弹层</dd></div>
+              <div><dt>快捷键</dt><dd><kbd>⌘K</kbd> 命令面板 · <kbd>/</kbd> 搜索 · <kbd>Esc</kbd> 关闭弹层</dd></div>
               <div><dt>仓库</dt><dd><a href="https://github.com/Oro41n/designer-workbench" target="_blank" rel="noopener">github.com/Oro41n/designer-workbench</a></dd></div>
             </dl>
           </div>
@@ -141,20 +143,23 @@ export default {
     }
 
     async function refreshStats() {
-      const el = root.querySelector('[data-image-count]');
-      if (!el) return;
-      el.textContent = String(await countImages());
+      const imgEl = root.querySelector('[data-image-count]');
+      const boardEl = root.querySelector('[data-board-count]');
+      if (imgEl) imgEl.textContent = String(await countImages());
+      if (boardEl) boardEl.textContent = String(await countBoards());
     }
 
     async function handleExport() {
       toast('正在打包数据与图片…');
       const images = await exportImages();
+      const boards = await exportBoards();
       const payload = {
         app: 'designer-workbench',
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         state: exportData(),
-        images
+        images,
+        boards
       };
       downloadFile(`designer-workbench-${todayISO()}.json`, JSON.stringify(payload, null, 2));
       toast(`导出完成（含 ${Object.keys(images).length} 张图片）`, { type: 'success' });
@@ -180,6 +185,7 @@ export default {
       if (!ok) return;
       replaceState(nextState);
       if (parsed.images) await importImages(parsed.images);
+      if (Array.isArray(parsed.boards)) await importBoards(parsed.boards);
       toast('导入完成', { type: 'success' });
       hydrateImages(document);
       refresh();
@@ -260,6 +266,7 @@ export default {
         }).then(ok => {
           if (!ok) return;
           clearSamples();
+          deleteSampleBoards();
           toast('示例数据已清除');
           refresh();
         });
@@ -275,6 +282,7 @@ export default {
           if (!ok) return;
           const images = await exportImages();
           await Promise.all(Object.keys(images).map(id => deleteImage(id)));
+          await clearBoards();
           clearAll();
           toast('全部数据已清空');
           refresh();
