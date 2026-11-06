@@ -1,0 +1,19 @@
+name: MJ Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe Midjourney endpoints from GitHub runner
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+          for u in "https://www.midjourney.com/explore" "https://www.midjourney.com/api/app/recent-jobs" "https://cdn.midjourney.com/"; do
+            code=$(curl -s -o /tmp/body -w "%{http_code}" -A "$UA" --max-time 25 "$u" || echo "ERR")
+            bytes=$(wc -c < /tmp/body 2>/dev/null || echo 0)
+            echo "URL=$u STATUS=$code BYTES=$bytes"
+            grep -o -m1 "Just a moment" /tmp/body || true
+            grep -o -m1 "cloudflare" /tmp/body || true
+          done
