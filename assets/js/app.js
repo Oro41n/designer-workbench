@@ -31,7 +31,7 @@ const MOBILE_NAV = [
   { route: 'learn', label: '学习', icon: 'learn' }
 ];
 const VIEWS = { home, projects, boards, board, portfolio, learn, library, settings };
-const BASE_TITLE = 'Oro — Design × Code';
+const BASE_TITLE = '41n — Design × Code';
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let viewEl = document.getElementById('view');
@@ -128,7 +128,7 @@ function mountView(route, param) {
     console.error(err);
   }
   updateNav(route);
-  document.title = route === 'home' ? BASE_TITLE : `${NAV.find(n => n.route === route)?.label || '画板'} · Oro`;
+  document.title = route === 'home' ? BASE_TITLE : `${NAV.find(n => n.route === route)?.label || '画板'} · 41n`;
   hydrateImages?.(viewEl);
   document.querySelectorAll('.site-nav a').forEach(a => {
     if (a.dataset.route === (route === 'board' ? 'boards' : route)) a.classList.add('is-active');
@@ -148,7 +148,7 @@ function renderRoute({ initial = false } = {}) {
     const vlabel = document.getElementById('veil-label');
     const vindex = document.getElementById('veil-index');
     if (veil) {
-      if (vlabel) vlabel.textContent = 'ORO';
+      if (vlabel) vlabel.textContent = '41n';
       if (vindex) vindex.textContent = 'DESIGN × CODE';
       veil.classList.add('is-on');
     }
@@ -358,9 +358,9 @@ function bindGlobal() {
 
   subscribeTimer(snap => {
     if (snap.running) {
-      document.title = `${timeText(snap.remaining)} · ${snap.mode === 'focus' ? '专注' : '休息'} — Oro`;
+      document.title = `${timeText(snap.remaining)} · ${snap.mode === 'focus' ? '专注' : '休息'} — 41n`;
     } else {
-      document.title = currentRoute === 'home' ? 'Oro — Design × Code' : `${NAV.find(n => n.route === currentRoute)?.label || '画板'} · Oro`;
+      document.title = currentRoute === 'home' ? '41n — Design × Code' : `${NAV.find(n => n.route === currentRoute)?.label || '画板'} · 41n`;
     }
   });
 

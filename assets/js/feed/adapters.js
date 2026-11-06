@@ -54,7 +54,7 @@ export const unsplash = {
       raw: p.urls.raw || p.urls.full,
       author: p.user?.name || 'Unsplash contributor',
       authorUrl: p.user?.links?.html || 'https://unsplash.com',
-      link: `${p.links?.html || 'https://unsplash.com'}?utm_source=oro_workbench&utm_medium=referral`,
+      link: `${p.links?.html || 'https://unsplash.com'}?utm_source=41n_workbench&utm_medium=referral`,
       title: p.alt_description || p.description || 'Untitled',
       license: 'Unsplash License',
       licenseUrl: 'https://unsplash.com/license'

@@ -1,4 +1,4 @@
-# Oro 设计工作台 · Designer Workbench
+# 41n 设计工作台 · Designer Workbench
 
 一个面向平面设计师的个人工作台：项目看板、作品集（设计 + 编程）、学习打卡、灵感素材库、番茄钟，以及内置的印前画板工具（类 Figma Lite：无限画布、图层、属性、PNG / SVG 导出）。纯静态站点，原生 HTML / CSS / ES Modules，无构建、无外部 CDN，数据保存在本机浏览器。
 

@@ -1354,7 +1354,7 @@ export default {
     function updateHeader() {
       if (!board) return;
       metaEl.textContent = `${board.width} × ${board.height} px · ${board.objects.length} 个对象`;
-      document.title = `${board.name} · 画板 — Oro 印前工作台`;
+      document.title = `${board.name} · 画板 — 41n 印前工作台`;
     }
 
     function updateCount() {

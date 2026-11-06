@@ -112,7 +112,7 @@ export default {
           <div class="hv-copy">
             <p class="hv-kicker"><span>01</span> Index / Portfolio &amp; Workbench</p>
             <h1 class="hv-title">
-              <span class="mask-line"><span style="--d:0">ORO<em>®</em></span></span>
+              <span class="mask-line"><span style="--d:0">41n<em>®</em></span></span>
               <span class="mask-line"><span style="--d:1"><span class="hv-sub">Design <b>×</b> Code</span></span></span>
             </h1>
             <p class="hv-note">
@@ -279,7 +279,7 @@ export default {
           </div>
         </div>
         <div class="hv-foot-baseline">
-          <span>© 2026 Oro — Design × Code</span>
+          <span>© 2026 41n — Design × Code</span>
           <span>Native HTML / CSS / ES Modules + WebGL</span>
           <span>静态站点 · 数据留在本机</span>
         </div>
