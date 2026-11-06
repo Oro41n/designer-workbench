@@ -1,85 +1,63 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#EFE9DB">
-  <meta name="description" content="Oro 印前工作台：带无限画板的项目看板、作品集、学习打卡、灵感库与番茄钟，数据保存在本地。">
-  <title>Oro 印前工作台</title>
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="description" content="Oro —— 设计师的个人工作台：作品集、项目、画板、学习与灵感。大幅影像、滚动叙事，数据保存在本地。">
+  <title>Oro — Design × Code</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="assets/css/views.css">
 </head>
-<body>
+<body class="night">
   <a class="skip-link" href="#view">跳到主要内容</a>
   <div class="grain" aria-hidden="true"></div>
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
 
-  <div class="app-shell">
-    <aside class="sidebar" aria-label="主导航">
-      <div class="brand">
-        <a class="brand-lockup" href="#/home" aria-label="ORO 印前工作台">
-          <svg class="brand-glyph" viewBox="0 0 48 48" aria-hidden="true">
-            <circle cx="24" cy="24" r="10.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
-            <circle cx="24" cy="24" r="3" fill="currentColor"/>
-            <path d="M24 1.5v11M24 35.5v11M1.5 24h11M35.5 24h11" stroke="currentColor" stroke-width="1.1"/>
-            <path d="M6 6h7M6 6v7M42 6h-7M42 6v7M6 42h7M6 42v-7M42 42h-7M42 42v-7" stroke="currentColor" stroke-width="1"/>
-          </svg>
-          <span class="brand-word">ORO<span class="brand-dot">.</span></span>
-        </a>
-        <p class="brand-sub">Print studio / 印前工作台</p>
-      </div>
-      <nav class="nav" id="side-nav" aria-label="页面导航"></nav>
-      <div class="sidebar-foot">
-        <a class="side-profile" href="#/settings" id="side-profile" aria-label="个人资料与设置">
-          <span class="avatar avatar--sm" id="side-avatar" aria-hidden="true"></span>
-          <span class="side-profile-text">
-            <span class="side-name" id="side-name">（你的名字）</span>
-            <span class="side-role" id="side-role">平面设计师</span>
-          </span>
-        </a>
-        <div class="side-actions">
-          <button type="button" class="icon-btn" id="theme-toggle" aria-label="切换主题" title="切换浅色 / 深色">
-            <span id="theme-icon"></span>
-          </button>
-          <a class="icon-btn" href="https://github.com/Oro41n/designer-workbench" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-              <path d="M9 19c-4 1.2-4-2.2-5.5-2.8M14.5 21v-3.6c0-1 .1-1.4-.5-2 2.3-.3 4.6-1.1 4.6-5 0-1.1-.4-2-1-2.7.1-.3.5-1.3-.1-2.7 0 0-.9-.3-2.9 1a9.8 9.8 0 0 0-5.2 0C7.4 4.4 6.5 4.7 6.5 4.7c-.6 1.4-.2 2.4-.1 2.7-.6.7-1 1.6-1 2.7 0 3.9 2.3 4.7 4.6 5-.4.5-.6 1-.5 2V21"/>
-            </svg>
-          </a>
-        </div>
-        <p class="side-note">数据保存在本机浏览器<br>图片存于 IndexedDB</p>
-      </div>
-    </aside>
+  <div class="cursor" id="cursor" aria-hidden="true">
+    <div class="cursor-ring"></div>
+    <div class="cursor-dot"></div>
+    <div class="cursor-label">VIEW</div>
+  </div>
 
-    <div class="main">
-      <header class="topbar">
-        <div class="topbar-inner">
-          <div class="topbar-left">
-            <a class="mobile-brand" href="#/home" aria-label="ORO 印前工作台">ORO.</a>
-            <span class="topbar-section" id="topbar-section">工作台</span>
-          <span class="topbar-date" id="topbar-date"></span>
-          </div>
-          <div class="topbar-actions">
-            <button type="button" class="search-btn palette-btn" id="palette-open" aria-label="命令面板（快捷键 Command K）">
-              <span class="search-btn-icon" aria-hidden="true">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 6.5a2.5 2.5 0 1 0-2.5 2.5H9V6.5z"/><path d="M15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5z"/><path d="M9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5z"/><path d="M15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5z"/></svg>
-              </span>
-              <span class="search-btn-text">命令</span>
-              <kbd>⌘K</kbd>
-            </button>
-            <button type="button" class="search-btn search-btn--icon" id="search-open" aria-label="搜索（快捷键 /）" title="搜索 /">
-              <span class="search-btn-icon" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
-              </span>
-              <span class="sr-only">搜索</span>
-            </button>
-            <span class="save-status" id="save-status" aria-live="polite">已保存</span>
-            <a class="avatar avatar--top" href="#/settings" id="top-avatar" aria-label="打开设置"><span id="top-avatar-inner">我</span></a>
-          </div>
-        </div>
-      </header>
-      <main id="view" tabindex="-1"></main>
+  <div class="veil" id="veil" aria-hidden="true">
+    <div class="veil-inner">
+      <div class="veil-index" id="veil-index">01 / INDEX</div>
+      <div class="veil-label" id="veil-label">ORO</div>
+      <div class="veil-line"></div>
     </div>
   </div>
+
+  <header class="site-header" id="site-header">
+    <a class="brand" href="#/home" aria-label="Oro 首页">
+      <span class="brand-mark">ORO<span>.</span></span>
+      <span class="brand-note">Design × Code</span>
+    </a>
+    <nav class="site-nav" id="site-nav" aria-label="主导航"></nav>
+    <div class="header-tools">
+      <span class="save-status" id="save-status" aria-live="polite"></span>
+      <button type="button" class="tool-btn tool-btn--wide" id="palette-open" aria-label="命令面板（Ctrl 或 Command 加 K）">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6.5a2.5 2.5 0 1 0-2.5 2.5H9V6.5z"/><path d="M15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5z"/><path d="M9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5z"/><path d="M15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5z"/></svg>
+        <span>命令</span><kbd>⌘K</kbd>
+      </button>
+      <button type="button" class="tool-btn" id="search-open" aria-label="搜索（快捷键 /）" title="搜索 /">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
+      </button>
+      <button type="button" class="tool-btn" id="theme-toggle" aria-label="切换深浅主题" title="切换主题">
+        <span id="theme-icon"></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer class="site-foot--mini" id="site-foot">
+    <span>ORO © 2026 — Design × Code</span>
+    <span>数据保存在本机 · 不上传云端</span>
+    <a href="#/settings">设置 / 存储</a>
+  </footer>
 
   <nav class="mobile-nav" id="mobile-nav" aria-label="底部导航"></nav>
 

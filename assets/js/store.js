@@ -1,4 +1,4 @@
-// 状态管理：localStorage 持久化 + 示例数据种子
+﻿// 状态管理：localStorage 持久化 + 示例数据种子
 import { todayISO, weekDates, shiftDate, uid } from './util.js';
 
 const KEY = 'dw.state.v1';
@@ -19,7 +19,7 @@ function emptyState() {
       email: '',
       avatarId: null
     },
-    theme: 'light',
+    theme: 'dark',
     tasks: [],
     focusSessions: [],
     projects: [],
@@ -33,7 +33,14 @@ function emptyState() {
 function sampleState() {
   const today = todayISO();
   const week = weekDates();
-  const designCover = (n) => `assets/covers/${n}.svg`;
+  const designCover = (n) => ({
+    poster: 'assets/img/work-poster.webp',
+    brochure: 'assets/img/work-brochure.webp',
+    packaging: 'assets/img/work-packaging.webp',
+    logo: 'assets/img/work-identity.webp',
+    app: 'assets/img/work-web.webp',
+    code: 'assets/img/work-web.webp'
+  }[n] || `assets/covers/${n}.svg`);
   return {
     version: VERSION,
     profile: {
@@ -44,7 +51,7 @@ function sampleState() {
       email: '',
       avatarId: null
     },
-    theme: 'light',
+    theme: 'dark',
     tasks: [
       { id: uid('task'), title: '把城市文化节主视觉改到第 3 版', done: false, sample: true, createdAt: Date.now() },
       { id: uid('task'), title: '给茶礼画册补齐第 12–16 页版式', done: false, sample: true, createdAt: Date.now() },

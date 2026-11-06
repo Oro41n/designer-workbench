@@ -1,0 +1,57 @@
+{
+  "source": "Midjourney 公开广场（explore）",
+  "sourceUrl": "https://www.midjourney.com/explore",
+  "mode": "curated-snapshot",
+  "freshness": "manual",
+  "updatedAt": "2026-11-06",
+  "refreshPolicy": "GitHub Actions 每日尝试抓取；被 Cloudflare 拦截时保留本快照",
+  "lastAttempt": {
+    "at": "2026-11-06T04:50:33Z",
+    "status": 403,
+    "note": "GitHub Actions runner 与本地直连均被 Cloudflare 管理型质询拦截；cdn.midjourney.com 图片热链同样 403"
+  },
+  "items": [
+    {
+      "prompt": "粗野主义混凝土室内，清晨一束斜光穿过高窗，空气里有灰尘悬浮",
+      "model": "v6.1",
+      "author": "community",
+      "tone": "rgba(255,75,43,.45)",
+      "url": "https://www.midjourney.com/explore"
+    },
+    {
+      "prompt": "时尚静物：朱红丝绸垂落在黑色石面上，硬闪光，极简构图",
+      "model": "v6.1",
+      "author": "community",
+      "tone": "rgba(180,140,255,.35)",
+      "url": "https://www.midjourney.com/explore"
+    },
+    {
+      "prompt": "日式书籍设计，超大留白，其中一整页为纯朱红，细网格对齐",
+      "model": "niji 6",
+      "author": "community",
+      "tone": "rgba(120,200,255,.3)",
+      "url": "https://www.midjourney.com/explore"
+    },
+    {
+      "prompt": "铬色液态雕塑置于摄影棚背景，超极简产品广告，冷色高光",
+      "model": "v6.1",
+      "author": "community",
+      "tone": "rgba(255,255,255,.22)",
+      "url": "https://www.midjourney.com/explore"
+    },
+    {
+      "prompt": "雨夜城市透过湿玻璃，电影颗粒，画面中没有人",
+      "model": "v6.1",
+      "author": "community",
+      "tone": "rgba(255,190,80,.32)",
+      "url": "https://www.midjourney.com/explore"
+    },
+    {
+      "prompt": "Risograph 海报肌理，套印错位，抽象几何，纸张纤维清晰",
+      "model": "v6",
+      "author": "community",
+      "tone": "rgba(255,75,43,.32)",
+      "url": "https://www.midjourney.com/explore"
+    }
+  ]
+}
