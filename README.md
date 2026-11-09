@@ -25,23 +25,28 @@
 
 全局：固定顶栏（品牌 / 编号导航 / 命令 / 搜索 / 主题）、移动端底部导航、**命令面板 `⌘K` / `Ctrl+K`**（搜索并跳转页面 / 项目 / 作品 / 画板，执行「新建画板 / 新建项目 / 开始专注 / 切换主题」）、`/` 快捷键搜索、`Esc` 关闭弹层、跳转到主内容的 skip link、可见 focus、`aria` 标签、`prefers-reduced-motion`、空状态、保存状态提示、Toast 反馈。示例数据均带「示例」标记。
 
-## 图流与配色引擎（v3）
+## 实时图流与配色引擎（Unsplash）
 
-首页的「此刻的颜色」图流**不是 Midjourney 抓取**，而是可公开访问、许可清晰的图库；每次加载都重新取图、重新取色。
+首页的「此刻的颜色」图流走 **Unsplash 官方 API**，每次打开 / 刷新 / 点「换一批图」都请求一次 `/photos/random`，没有本地快照，也没有「非实时」兜底文案。
 
-| 项 | 说明 |
+| 项 | 实现 |
 | --- | --- |
-| 默认源 | Lorem Picsum（`https://picsum.photos`，随机图片服务，图片来自 Unsplash，遵循 [Unsplash License](https://unsplash.com/license)） |
-| 其它源 | Unsplash（需免费 Access Key）、Pexels（需免费 API Key）、Openverse（CC，无需 Key）。全部通过 `assets/js/feed/adapters.js` 实现；仓库不带任何 Key，未填写时视为未接入 |
-| 切换方式 | 改 `assets/js/feed/config.js` 的 `source` / `keys`，或在设置页写入 `localStorage['dw.feed.v1']`；不写代码即可换源 |
-| 刷新机制 | 每次页面加载生成新的随机种子（Picsum）或请求 `/photos/random`（Unsplash），不缓存历史结果；「换一批」按钮立即重新拉取 |
-| 取色 | 图片经 CORS 代理读取像素 → 40×40 缩略 → 5 簇 k-means → 映射 `--bg` / `--ink` / `--accent` / `--accent-2` → 900ms 插值过渡；同一组颜色通过 `dw:palette` 事件驱动首屏 WebGL 着色器，深 / 浅模式各自重算。取色失败时回退品牌色并在面板标注原因 |
-| 许可与署名 | 卡片与说明区展示来源、许可链接与作者；Unsplash / Pexels 适配器按各自 API 指南附带作者主页与 `utm` 链接 |
-| 限制 | Picsum 的 `v2/list` 接口未返回 CORS 头，因此不使用其作者元数据（卡片署名为「Lorem Picsum / Unsplash」）；`images.weserv.nl` 仅作为读取像素的代理，图片展示仍直连原站；本机（中国内地网络）实测 `api.openverse.org` 连接超时，Openverse 适配器虽已写好但默认不启用，失败会自动降级到 Picsum；网络完全不可用时显示站内备用图并明确标注「非实时」 |
+| 请求 | `GET https://api.unsplash.com/photos/random?count=8&orientation=landscape&client_id=<Access Key>`，`cache: 'no-store'`；每次页面加载与「换一批」都是一次新请求 |
+| Key 在哪 | **Access Key（client_id）** 写在 [`assets/js/feed/config.js`](assets/js/feed/config.js) 的 `FEED_CONFIG.keys.unsplash`，随静态页面公开下发；这是 Unsplash 允许的公开客户端 key。也可用 `localStorage['dw.feed.v2']` 覆盖 |
+| Secret 在哪 | **只在本地 `.env.local`**（已加入 `.gitignore`），用于本机验证脚本；不进任何 HTML / JS / CSS / JSON / README / 截图，仓库与提交历史中不存在 |
+| 限流 | Demo 应用 **50 次/小时**。每次页面加载 1 次、换一批 1 次；同一时段多人访问会共享额度，超限返回 429 时页面给出可读提示并切站内备用图 |
+| 取色 | 图片直连 `images.unsplash.com`（带 CORS 头），Canvas 40×40 采样 + 5 簇 k-means → `--bg` / `--ink` / `--accent` / `--accent-2` → 900ms 插值过渡。像素读不到时**降级为接口返回的 `color` 字段**做色相种子（`paletteFromSeed`），仍走同一套角色映射与对比度校验 |
+| 对比度 | `paletteFromClusters` 内置 WCAG 校验：正文 `ink/bg` ≥ 4.6:1、强调色 ≥ 4.5:1、次强调 ≥ 3:1；`--on-accent` 自动在黑 / 白中选对比更高的一侧。深色与浅色模式各自重算 |
+| 署名 | 图流缩略图、当前照片栏、静态降级图与说明区都显示摄影师署名，并链接到 `links.html`（附 `utm_source=41n_workbench&utm_medium=referral`）；照片本身链接同样带 `utm` |
+| 下载追踪 | 「下载原图」与「存为画板素材」都会先请求 `links.download_location`（附公开 `client_id`），再打开原图；即使追踪请求被广告拦截器阻断，也不影响取图 |
+| 失败兜底 | 403（key 无效 / 无权限）、429（限流）、8 秒超时、网络不可达分别给出中文原因，并显示 `assets/img/work-*.webp` 站内备用图；页面不白屏，取色仍可用 |
 
-> 密钥策略：仓库与提交历史中没有任何 API Key。Unsplash / Pexels 只有在 `assets/js/feed/config.js` 的 `FEED_CONFIG.keys`（或 `localStorage['dw.feed.v1']`）填入你自己的 Key 后才会发起请求；未配置时页面仍使用 Picsum，不会声称已接入 Unsplash / Pexels。
+> 创意用法（都可用，不是摆设）：
+> 1. **配色板一键复制**：把当前图的 `--bg / --ink / --accent / --accent-2` 与 6 个取样色复制成 CSS 变量，直接粘进设计稿或代码。
+> 2. **图流入画板**：把当前照片压缩存入 IndexedDB，作为图片对象放进最近一个画板（没有画板时自动建「图流素材」），随后可在画板编辑器里继续排版。
+> 3. **滚动联动主题**：相机穿过每张图时，全站令牌跟着该图主色渐变；这也是「主色调随图同步变化」的主链路。
 
-> 说明：`images.weserv.nl` 是第三方图片代理，用于绕过 CORS 读取像素；如果代理不可用，图片仍能显示，但取色会失败并回退默认色板。
+> 说明：`images.weserv.nl` 代理仅保留给没有 CORS 的图源（Picsum / Openverse）；Unsplash 与 Pexels 都直连读像素。Pexels / Openverse 适配器仍在，可用 `source` 切换，但默认不启用。
 
 ### Midjourney：没有可接入的公开图流（2026-11-06 实测）
 
@@ -53,7 +58,29 @@
 | `cdn.midjourney.com` 直链 | `403`，带 / 不带 Referer 均拒绝热链 |
 | 公开镜像 / 授权图流 | 未找到任何可公开访问且许可清晰的 MJ 图流镜像；不采用「伪实时」包装 |
 
-结论：v3 **不接入 Midjourney**，页面上直接写明这一点；首页图流改用上述图库，并保证「每次加载换图 + 真实取色」。`assets/data/mj-feed.json` 仅作为 v2 的历史快照保留，标记为「快照 · 非实时」，不再出现在新首页。
+结论：**不接入 Midjourney**。首页图流改用上述图库，并保证「每次加载换图 + 真实取色」。`assets/data/mj-feed.json` 仅作为 v2 的历史数据保留，不再出现在新首页。
+
+## v4 镜头穿图（WebGL 相机）
+
+首页是一段连续的 3D 相机运动，不是 CSS 位移伪装的视差：
+
+- **相机与平面**：原生 WebGL（`assets/js/cam3d.js`）把图流照片放在不同 Z 深度的平面上；滚动进度直接驱动相机沿 Z 轴推进，从画框中间穿过，下一段在画框背后展开。带雾、景深与地面光池，平面允许偏心与轻微倾斜。
+- **5 个停靠点**：hero / 图流 / 作品 / 工作台 / 收尾。停靠点不等距，每段有独立关键帧（x/y/z、FOV、roll、pitch、时长），五种运动分别是斜穿、侧移推进、升降、绕行、俯冲；停靠前减速并 settle 0.2–0.4s，滚动带阻尼而非线性跟随；每次加载打乱图片顺序与平面布局。
+
+| 段 | 运动 | 滚动占比 | 17s 录屏约时长 | 控制点 c1 → c2 | FOV / roll / pitch |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 斜穿 | 18% | 3.1s | `[4.4,2.4,-2.2] → [-1.2,1.4,1.6]` | 54° / -1.6° / 2° |
+| 2 | 侧移推进 | 22% | 3.7s | `[5.0,0.6,-2.4] → [4.0,-0.6,2.4]` | 47° / 1.8° / 0° |
+| 3 | 升降 | 20% | 3.4s | `[0.4,2.8,-2.4] → [0.2,2.2,2.4]` | 58° / -2.6° / 2° |
+| 4 | 绕行 | 25% | 4.3s | `[4.2,-1.8,-1.8] → [1.6,1.8,1.2]` | 51° / 2.2° / 4° |
+| 5 | 俯冲 | 15% | 2.6s | `[-1.2,0.8,-0.6] → [0.4,0.6,0.9]` | 62° / -6° / 10° |
+
+> 缓动：每段用 `smootherstep` 连接两端，停靠窗口内额外 settle 0.2–0.4s；滚动输入经临界阻尼弹簧，速度不线性跟随手指 / 滚轮。
+- **DOM 覆盖层**：标题、正文、按钮、取色板全部是真实 DOM，可选中、可聚焦、可读屏；没有把文字烘焙进贴图。
+- **作品集**：`#/portfolio` 改为 3D 画廊，点作品后相机飞近并由 DOM 详情接管，`Esc` 退回。
+- **降级**：`prefers-reduced-motion` 与 ≤900px 视口关闭穿越，退回静态堆叠 / 纵向图流；WebGL 不可用时同样退回静态版。
+- **性能记录**：23 个平面，单帧最多 23 个 drawcall（视锥剔除后 2–11）；无头 Edge + SwiftShader 下录屏稳定 15fps，15–20 秒可完整走完 5 段。
+- **素材**：`screenshots/v4-cam-scroll-17s.mp4`、`screenshots/v4-cam-*.png`。
 
 ## 画板工具（Lite Figma）
 
@@ -116,9 +143,13 @@ assets/
   js/pomodoro.js           全局番茄钟（时间戳计时，跨路由不中断）
   js/search.js             全局搜索
   js/views/*.js            八个页面视图（含画板架与编辑器）
+  js/feed/*.js             图流适配器（Unsplash / Picsum / Pexels / Openverse）、CORS 与失败兜底
+  js/cam3d.js              首页 WebGL 相机、平面与停靠点
+  js/theme-engine.js       像素取色、color 种子降级、WCAG 对比度校验与主题过渡
   js/util.js / icons.js    工具函数与内联 SVG 图标
-assets/img/*.webp          首页与示例作品的大幅影像（AI 生成后转 WebP，无外部图库）
-assets/data/mj-feed.json   Midjourney 人工策展快照 + 403 抓取记录（非实时）
+assets/img/*.webp          站内备用图与示例作品的大幅影像
+assets/data/mj-feed.json   v2 历史数据（首页已不引用）
+.env.local                 本地验证凭据（gitignore 排除，不入库）
 assets/covers/*.svg        未上传封面时的抽象几何兜底封面
 screenshots/               1600×900 与 390×844 实跑截图
 ```
@@ -203,7 +234,10 @@ python -m http.server 4173
 - v3 内页迁移（2026-11-06）：Edge / Playwright 在 1600×900 与 390×844 下遍历作品、项目、画板、学习、灵感、设置六页，均无横向滚动、控制台 / 页面 0 报错；页头标题与面板标题均为 v3 衬线字体，正文背景等于取色得到的 `--bg`。抽检通过：作品设计 / 编程分区切换、作品详情弹层、项目看板 / 列表切换（7 行）、浅色主题切换（设置页背景 `rgb(235,238,242)`）、命令面板（23 条动作）、画板编辑器（隐藏顶栏，画布 1230×818）、移动端底栏（`position: fixed`，页面底部留白 84px 不被遮挡）。
 - 使用 Edge（Playwright，Chromium 内核，1600×900）实跑画板全流程：新建 1080×1350 画板 → 矩形 / 文字 / 上传图片 → 拖动、8 点缩放、旋转 → 改填充 / 描边 → 图层排序 → 撤销 / 重做 → 自动保存 → 刷新恢复（3 个对象 + 4 行图层）→ 导出 PNG 2x（2160×2700，349,637 字节）→ 导出 SVG（17,174 字节，含 `<text>` 节点）。命令面板 `⌘K` 搜索「画板」返回 4 条结果，首项为「新建画板」；深浅主题、390×844 三页均无横向滚动（`scrollWidth = clientWidth = 390`），控制台与页面错误均为 0。
 - 性能：在编辑器中构造 123 个对象，连续 12 帧 Canvas 绘制平均 **0.65 ms**、最大 **4.4 ms**（约 60fps 预算内；不含历史快照与自动保存的序列化开销）。缩放 / 拖动 / 吸附均通过 `requestAnimationFrame` 合并重绘，图片使用离屏 `Image` 缓存。
+- v4 WebGL 相机：23 个平面，单帧 drawcall 2–11（上限 23）；无头 Edge + SwiftShader 录屏稳定 15fps，17 秒走完 5 段。`prefers-reduced-motion` 与 ≤900px 视口自动关闭穿越，退回静态堆叠 / 纵向图流，控制台 0 报错。
 - 截图见 [`screenshots/`](screenshots/)：首页桌面 / 浅色 / 移动端（`v3-desktop-*`、`v3-mobile-*`），六个内页桌面（`v3-inner-desktop-*`）与移动端（`v3-inner-mobile-*`），作品详情弹层、项目列表视图、设置浅色、画板编辑器。
+- 本轮 Unsplash 实跑截图：`unsplash-hero.png`（首屏）、`unsplash-signal-01.png`（图流 + 摄影师署名 + Unsplash 链接）、`unsplash-palette-compare.png`（同一画面暖橙 / 青绿两组主色对比）、`unsplash-signal-light.png`（浅色模式）、`unsplash-mobile-hero.png` / `unsplash-mobile-signal-full.png`（390×844）、`unsplash-fallback.png`（403 兜底提示 + 站内备用图）。
+- v4 镜头穿图截图与录屏：`screenshots/v4-cam-hero.png`、`v4-cam-signal.png`、`v4-cam-works.png`、`v4-cam-pf-intro.png`、`v4-cam-pf-detail.png`、`v4-cam-mobile-hero.png`、`v4-cam-reduced-hero.png`，五段运动关键帧 `v4-cam-motion-1-oblique.png` … `v4-cam-motion-5-dive.png`，以及 `v4-cam-scroll-17s.mp4`。
 - 体积（未压缩）：HTML 3.2 KB，CSS 185.0 KB（`app.css` 108.2 / `pages-v3.css` 43.4 / `v3.css` 33.4），JS 303.1 KB；无外部字体与 CDN 请求。首屏影像为 WebP，示例 SVG 仅作兜底。
 
 ## 已知限制与未实现
@@ -215,6 +249,9 @@ python -m http.server 4173
 - 移动端可查看画板、选择对象与简单拖动，复杂编辑会提示「建议桌面端」；不支持多点触控双指缩放。
 - 筛选与视图状态未写入 URL（路由只记录页面与项目 / 作品 / 画板 id）；刷新后筛选会回到默认。
 - 示例作品是抽象几何封面，不代表真实项目；示例项目 / 学习记录 / 示例画板同样带「示例」标记。
-- **Midjourney 没有可接入的公开图流**：广场页 / API / CDN 均为 403 或 401，静态 Pages 无法抓取或热链；v3 首页不接入 MJ，改用 Picsum 等公开图库并真实取色。`assets/data/mj-feed.json` 只是 v2 的人工策展快照（非实时），页面不再展示。
+- **Midjourney 没有可接入的公开图流**：广场页 / API / CDN 均为 403 或 401，静态 Pages 无法抓取或热链；首页改用 Unsplash 官方 `/photos/random` 并真实取色。`assets/data/mj-feed.json` 只是 v2 的历史数据，页面不再引用。
+- **Unsplash Demo 限流 50 次/小时**：额度由应用共享，多人同时访问会更快触发 429；页面会显示原因并切站内备用图，不会白屏。若用于正式流量，应换成生产应用并通过轻量后端代理请求。
+- **随机图不是策展**：`/photos/random` 返回全站随机照片，可能与设计主题无关；需要主题化时可在 `config.query` 填关键词，或改走 `/photos` 的策展集合。
+- **下载追踪依赖浏览器允许请求**：`download_location` 调用是尽力而为，广告拦截器或离线状态下可能不成功，但图片仍可正常显示。
 - 六个内页由 [`assets/css/pages-v3.css`](assets/css/pages-v3.css) 统一覆盖：旧的 `site.css` / `views.css` 已删除，`app.css` 只保留基础重置与画板编辑器；编辑器仍使用自身的舞台配色，不与新外壳共用全部令牌。
 - 仓库默认公开、联系方式默认留空、强调色默认朱红，均可按需调整。

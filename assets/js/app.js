@@ -120,6 +120,7 @@ function mountView(route, param) {
   currentRoute = route;
   document.body.classList.toggle('is-editor', route === 'board');
   document.body.classList.toggle('is-home', route === 'home');
+  document.body.classList.toggle('is-portfolio', route === 'portfolio');
   try {
     currentView = VIEWS[route].mount(viewEl, { param }) || null;
   } catch (err) {

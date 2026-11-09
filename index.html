@@ -1,6 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
-<head>
+<html lang="zh-CN" data-theme="dark"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
@@ -10,11 +9,13 @@
   <link rel="stylesheet" href="assets/css/app.css">
   <link rel="stylesheet" href="assets/css/v3.css">
   <link rel="stylesheet" href="assets/css/pages-v3.css">
+  <link rel="stylesheet" href="assets/css/scenes.css">
+  <link rel="stylesheet" href="assets/css/cam.css">
 </head>
-<body class="night v3">
+<body class="v3">
   <a class="skip-link" href="#view">跳到主要内容</a>
   <div class="grain" aria-hidden="true"></div>
-  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true" style="transform: scaleX(0);"></div>
 
   <div class="cursor" id="cursor" aria-hidden="true">
     <div class="cursor-ring"></div>
@@ -24,7 +25,7 @@
 
   <div class="veil" id="veil" aria-hidden="true">
     <div class="veil-inner">
-      <div class="veil-index" id="veil-index">01 / INDEX</div>
+      <div class="veil-index" id="veil-index">DESIGN × CODE</div>
       <div class="veil-label" id="veil-label">41n</div>
       <div class="veil-line"></div>
     </div>
@@ -35,23 +36,46 @@
       <span class="brand-mark">41n<span>.</span></span>
       <span class="brand-note">Design × Code</span>
     </a>
-    <nav class="site-nav" id="site-nav" aria-label="主导航"></nav>
+    <nav class="site-nav" id="site-nav" aria-label="主导航">
+      <a href="#/portfolio" data-route="portfolio">
+        <i>02</i>作品
+      </a>
+      <a href="#/projects" data-route="projects">
+        <i>03</i>项目
+      </a>
+      <a href="#/boards" data-route="boards">
+        <i>04</i>画板
+      </a>
+      <a href="#/learn" data-route="learn">
+        <i>05</i>学习
+      </a>
+      <a href="#/library" data-route="library">
+        <i>06</i>灵感
+      </a>
+      <a href="#/settings" data-route="settings">
+        <i>07</i>设置
+      </a></nav>
     <div class="header-tools">
       <span class="save-status" id="save-status" aria-live="polite"></span>
       <button type="button" class="tool-btn tool-btn--wide" id="palette-open" aria-label="命令面板（Ctrl 或 Command 加 K）">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6.5a2.5 2.5 0 1 0-2.5 2.5H9V6.5z"/><path d="M15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5z"/><path d="M9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5z"/><path d="M15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5z"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M9 6.5a2.5 2.5 0 1 0-2.5 2.5H9V6.5z"></path><path d="M15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5z"></path><path d="M9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5z"></path><path d="M15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5z"></path></svg>
         <span>命令</span><kbd>⌘K</kbd>
       </button>
       <button type="button" class="tool-btn" id="search-open" aria-label="搜索（快捷键 /）" title="搜索 /">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4.5 4.5"></path></svg>
       </button>
       <button type="button" class="tool-btn" id="theme-toggle" aria-label="切换深浅主题" title="切换主题">
-        <span id="theme-icon"></span>
+        <span id="theme-icon"><svg class="icon " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15a6.5 6.5 0 0 1-8-9 7 7 0 1 0 8 9z"></path></svg></span>
       </button>
     </div>
   </header>
 
-  <main id="view" tabindex="-1"></main>
+    <main id="view" tabindex="-1" class="view">
+      <section class="cam-journey is-static" data-journey aria-label="工作台加载中">
+        <div class="cam-stage">
+          <div class="cam-loading" data-loading><i></i>镜头装填中 · 正在取图</div>
+        </div>
+      </section></main>
 
   <footer class="site-foot--mini" id="site-foot">
     <span>41n © 2026 — Design × Code</span>
@@ -59,11 +83,27 @@
     <a href="#/settings">设置 / 存储</a>
   </footer>
 
-  <nav class="mobile-nav" id="mobile-nav" aria-label="底部导航"></nav>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="底部导航">
+      <a href="#/home" data-route="home" aria-label="首页" class="is-active" aria-current="page">
+        <svg class="icon " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7"></path><path d="M5.5 9.5v10h13v-10"></path><path d="M9.5 19.5v-5h5v5"></path></svg><span>首页</span>
+      </a>
+      <a href="#/portfolio" data-route="portfolio" aria-label="作品">
+        <svg class="icon " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15"></rect><path d="m3.5 15 4.5-4 4 3.5 3-2.5 5 4.5"></path><circle cx="8.5" cy="9" r="1.4"></circle></svg><span>作品</span>
+      </a>
+      <a href="#/projects" data-route="projects" aria-label="项目">
+        <svg class="icon " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="5" height="15"></rect><rect x="9.5" y="4.5" width="5" height="9"></rect><rect x="15.5" y="4.5" width="5" height="12"></rect></svg><span>项目</span>
+      </a>
+      <a href="#/boards" data-route="boards" aria-label="画板">
+        <svg class="icon " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V4h4"></path><path d="M16 4h4v4"></path><path d="M20 16v4h-4"></path><path d="M8 20H4v-4"></path><rect x="8" y="8" width="8" height="8"></rect></svg><span>画板</span>
+      </a>
+      <a href="#/learn" data-route="learn" aria-label="学习">
+        <svg class="icon " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5c2.5-1 5-1 8 1v13c-3-2-5.5-2-8-1z"></path><path d="M20 5.5c-2.5-1-5-1-8 1v13c3-2 5.5-2 8-1z"></path></svg><span>学习</span>
+      </a></nav>
 
   <div id="modal-root"></div>
   <div id="toast-root" class="toast-root" aria-live="polite"></div>
 
   <script type="module" src="assets/js/app.js"></script>
-</body>
-</html>
+
+
+</body></html>

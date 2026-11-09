@@ -19,6 +19,8 @@ uniform vec3 uBg;
 uniform vec3 uA;
 uniform vec3 uB;
 uniform float uLight;
+uniform float uWarp;
+uniform float uCam;
 
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
 
@@ -46,9 +48,17 @@ float fbm(vec2 p){
 
 void main(){
   vec2 uv = vUv;
+  // 镜头推进：滚动进度轻微改变取样中心，形成"摄影机前移"而不是淡入
+  uv.y += uCam * 0.07;
   float ar = uRes.x / max(uRes.y, 1.0);
   vec2 p = vec2(uv.x * ar, uv.y);
   float t = uTime * 0.035;
+
+  // 滚动速度驱动的位移：快速滚动时噪声场被横向拉开
+  p += vec2(
+    sin(p.y * 3.1 + t * 2.4),
+    cos(p.x * 2.4 - t * 1.8)
+  ) * uWarp * 0.28;
 
   vec2 q = vec2(fbm(p * 1.45 + vec2(t, 3.2)), fbm(p * 1.55 + vec2(5.7, -t)));
   vec2 r = vec2(
@@ -116,6 +126,10 @@ export function createInkField(canvas) {
   let pointer = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5 };
   let colors = { bg: [10, 10, 12], accent: [255, 75, 43], accent2: [176, 107, 255], ink: [244, 241, 234] };
   let light = 0;
+  let warp = 0;
+  let targetWarp = 0;
+  let cam = 0;
+  let targetCam = 0;
   let ctx2d = null;
   let observer = null;
 
@@ -146,7 +160,9 @@ export function createInkField(canvas) {
           bg: gl.getUniformLocation(program, 'uBg'),
           a: gl.getUniformLocation(program, 'uA'),
           b: gl.getUniformLocation(program, 'uB'),
-          light: gl.getUniformLocation(program, 'uLight')
+          light: gl.getUniformLocation(program, 'uLight'),
+          warp: gl.getUniformLocation(program, 'uWarp'),
+          cam: gl.getUniformLocation(program, 'uCam')
         };
       } else {
         program = null;
@@ -182,6 +198,8 @@ export function createInkField(canvas) {
       gl.uniform3fv(uniforms.a, rgbToList(colors.accent2));
       gl.uniform3fv(uniforms.b, rgbToList(colors.accent));
       gl.uniform1f(uniforms.light, light);
+      gl.uniform1f(uniforms.warp, warp);
+      gl.uniform1f(uniforms.cam, cam);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       return;
     }
@@ -208,6 +226,8 @@ export function createInkField(canvas) {
     if (!reduced) {
       pointer.x += (pointer.tx - pointer.x) * 0.06;
       pointer.y += (pointer.ty - pointer.y) * 0.06;
+      warp += (targetWarp - warp) * 0.14;
+      cam += (targetCam - cam) * 0.08;
     }
     draw(reduced ? 0 : (now - startTime) / 1000);
     if (!reduced) raf = requestAnimationFrame(loop);
@@ -243,6 +263,16 @@ export function createInkField(canvas) {
 
   return {
     setColors(next = {}) { colors = { ...colors, ...next }; },
+    // 滚动镜头：v 是归一化滚动速度，p 是当前场景进度
+    setScroll({ v = 0, p = 0 } = {}) {
+      targetWarp = Math.min(1, Math.max(0, v) * 1.4);
+      targetCam = Math.min(1, Math.max(0, p));
+      if (reduced) {
+        warp = targetWarp;
+        cam = targetCam;
+        draw(0);
+      }
+    },
     resize,
     destroy() {
       running = false;

@@ -13,7 +13,7 @@ export const picsum = {
   home: 'https://picsum.photos',
   license: 'Unsplash License',
   licenseUrl: 'https://unsplash.com/license',
-  refresh: '每次页面加载都会请求新的随机种子，因此图片每次都不同；不保留历史缓存。',
+  refresh: '每次页面加载都会请求新的随机种子，因此图片每次都不同；不保留历史缓存。备用源，默认不启用。',
   note: 'Lorem Picsum 是公开的随机图片服务，图片全部来自 Unsplash。它是「随机图片流」，不是设计师作品流，也没有 Midjourney 内容。',
   async fetch({ count }) {
     const seeds = Array.from({ length: count }, seedOf);
@@ -30,31 +30,54 @@ export const picsum = {
   }
 };
 
+const UTM = 'utm_source=41n_workbench&utm_medium=referral';
+const withUtm = url => {
+  if (!url) return '';
+  const base = String(url);
+  return `${base}${base.includes('?') ? '&' : '?'}${UTM}`;
+};
+
 export const unsplash = {
   id: 'unsplash',
   label: 'Unsplash',
-  home: 'https://unsplash.com',
+  home: `https://unsplash.com/?${UTM}`,
   license: 'Unsplash License',
   licenseUrl: 'https://unsplash.com/license',
   requiresKey: 'unsplash',
-  refresh: '每次加载调用 /photos/random，返回当下不同的照片；同一会话内不缓存。',
-  note: '需要免费的 Unsplash Access Key。图片可直接跨域读取取色；作者与主页按 Unsplash API 指南标注。',
-  async fetch({ count, query, key }) {
+  refresh: '每次加载用公开 client_id 调用 /photos/random?count=8（不缓存），刷新页面或点「换一批」都会得到新的一组照片。',
+  note: 'Access Key 随前端公开下发，仅用于免授权读接口；Demo 应用限流 50 次/小时。作者、作品页与下载追踪按 Unsplash API 指南标注。',
+  async fetch({ count, query, key, signal }) {
     if (!key) throw new Error('缺少 Unsplash Access Key');
-    const params = new URLSearchParams({ count: String(Math.min(count, 30)), orientation: 'landscape' });
+    const params = new URLSearchParams({
+      count: String(Math.min(Math.max(count, 1), 30)),
+      orientation: 'landscape',
+      // 官方支持在查询参数里带 client_id，静态站点无需 Authorization 头即可跨域
+      client_id: key
+    });
     if (query) params.set('query', query);
     const res = await fetch(`https://api.unsplash.com/photos/random?${params}`, {
-      headers: { Authorization: `Client-ID ${key}` },
-      cache: 'no-store'
+      cache: 'no-store',
+      signal
     });
-    if (!res.ok) throw new Error(`Unsplash HTTP ${res.status}`);
-    const list = await res.json();
-    return list.map(p => ({
+    if (!res.ok) {
+      const err = new Error(`Unsplash HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [data];
+    return list.filter(Boolean).map(p => ({
       id: `unsplash-${p.id}`,
-      raw: p.urls.raw || p.urls.full,
+      raw: p.urls?.raw || p.urls?.full || p.urls?.regular,
       author: p.user?.name || 'Unsplash contributor',
-      authorUrl: p.user?.links?.html || 'https://unsplash.com',
-      link: `${p.links?.html || 'https://unsplash.com'}?utm_source=41n_workbench&utm_medium=referral`,
+      authorUrl: withUtm(p.user?.links?.html) || `https://unsplash.com/?${UTM}`,
+      link: withUtm(p.links?.html) || `https://unsplash.com/?${UTM}`,
+      // 触发下载时先请求 download_location，再打开原图
+      download: p.links?.download || '',
+      downloadLocation: p.links?.download_location || '',
+      color: p.color || '',
+      width: p.width || 0,
+      height: p.height || 0,
       title: p.alt_description || p.description || 'Untitled',
       license: 'Unsplash License',
       licenseUrl: 'https://unsplash.com/license'

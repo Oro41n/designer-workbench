@@ -1,23 +1,41 @@
-// 作品集：设计 / 编程两个分区，封面本地上传（IndexedDB），筛选、精选与详情弹层
+// 作品集 v4.1「3D 画廊」：真实相机沿 X 轴穿过一组不同深度的画框
+// 点作品相机飞近，详情以整屏层接管；Esc 退回。移动端与 reduced-motion 退回纵向网格。
 import { getState, subscribe, update } from '../store.js';
 import { icon } from '../icons.js';
-import { pageHead, openModal, confirmDialog, toast, formValues, emptyState } from '../ui.js';
+import { openModal, confirmDialog, toast, formValues, emptyState } from '../ui.js';
 import { escapeHtml, uid, clampText, safeUrl, hostOf } from '../util.js';
-import { saveImage, deleteImage, getImageURL, hydrateImages } from '../images.js';
+import { saveImage, deleteImage, hydrateImages, getImageURL } from '../images.js';
+import { createCam3D } from '../cam3d.js';
 
 const SECTIONS = { design: '设计', code: '编程' };
 const CATEGORIES = {
   design: ['海报', '画册', 'Logo', '包装', '其他'],
   code: ['Web', '编程练习', '其他']
 };
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default {
   mount(root, ctx) {
     const filters = { section: 'design', category: '全部', featured: false };
-    const ui = {};
+    let cam = null;
+    let raf = 0;
+    let lastTime = 0;
+    let journeyTop = 0;
+    let journeySpan = 1;
+    let progress = -1;
+    let activeIndex = -1;
+    let detail = null;
+    let detailKeyHandler = null;
+    let detailFromFly = false;
+    let flying = false;
+    let flyTimer = 0;
+    let readyCount = 0;
+    let destroyed = false;
+    let currentWorks = [];
+    let lastHud = 0;
+    const staticMode = reducedMotion() || window.matchMedia('(max-width: 900px)').matches;
 
     root.addEventListener('click', onClick);
-    root.addEventListener('keydown', onKeydown);
     const off = subscribe(() => renderAll());
     renderAll();
 
@@ -25,42 +43,134 @@ export default {
       const id = ctx.param;
       history.replaceState(null, '', '#/portfolio');
       setTimeout(() => {
-        if (getState().portfolio.some(w => w.id === id)) openDetail(id);
+        if (getState().portfolio.some(w => w.id === id)) openDetail(id, { fly: false });
       }, 0);
     }
 
-    return { destroy: () => off() };
+    return {
+      destroy() {
+        destroyed = true;
+        off();
+        root.removeEventListener('click', onClick);
+        cancelAnimationFrame(raf);
+        clearTimeout(flyTimer);
+        cam?.destroy();
+        closeDetail(true);
+      }
+    };
+
+    /* ---------------- 页面结构 ---------------- */
 
     function renderAll() {
+      closeDetail(true);
+      destroyScene();
       const state = getState();
       const counts = {
         design: state.portfolio.filter(w => w.section === 'design').length,
         code: state.portfolio.filter(w => w.section === 'code').length
       };
+      const list = currentList();
+      const total = counts.design + counts.code;
+      currentWorks = list;
+
       root.innerHTML = `
-        ${pageHead({
-          kicker: 'Portfolio / 作品集',
-          title: '作品集',
-          lede: '设计成果与编程成果分开归档，方便按岗位投递。未上传封面时会显示抽象几何封面。',
-          actions: `<button type="button" class="btn btn-primary" data-work-new>${icon('plus', 16)} 新增作品</button>`
-        })}
-        <div class="portfolio-tabs" role="tablist" aria-label="作品分区">
-          ${Object.entries(SECTIONS).map(([key, label]) => `
-            <button type="button" role="tab" class="ptab ${filters.section === key ? 'is-on' : ''}" data-section="${key}" aria-selected="${filters.section === key}">
-              <span class="ptab-label">${label}</span>
-              <span class="ptab-count">${counts[key]}</span>
-            </button>`).join('')}
-        </div>
-        <div class="portfolio-filter">
-          <div class="chip-row" role="group" aria-label="按分类筛选">
-            ${['全部', ...CATEGORIES[filters.section]].map(c => `
-              <button type="button" class="chip ${filters.category === c ? 'is-on' : ''}" data-category="${escapeHtml(c)}" aria-pressed="${filters.category === c}">${escapeHtml(c)}</button>`).join('')}
+        <section class="pf3-intro">
+          <div>
+            <div class="pf3-head">
+              <div>
+                <p class="cam-kicker"><span>01</span> Portfolio / 作品集</p>
+                <h1 class="pf3-title" aria-label="作品集">
+                  <span>作品</span>
+                  <span class="pf3-title--b">集<em>${total}</em></span>
+                </h1>
+              </div>
+              <button type="button" class="btn btn-primary" data-work-new>${icon('plus', 16)} 新增作品</button>
+            </div>
+
+            <p class="pf3-lede">桌面端是一条真实的 3D 画廊：作品是不同深度的画框，滚动只推进相机。
+              点开任意作品，镜头先飞近画框，再由整屏详情接管；按 Esc 退回画廊。
+              手机与 reduced-motion 自动退回纵向��读。</p>
+
+            <div class="pf-controls">
+              <div class="portfolio-tabs" role="tablist" aria-label="作品分区">
+                ${Object.entries(SECTIONS).map(([key, label]) => `
+                  <button type="button" role="tab" class="ptab ${filters.section === key ? 'is-on' : ''}" data-section="${key}" aria-selected="${filters.section === key}">
+                    <span class="ptab-label">${label}</span>
+                    <span class="ptab-count">${counts[key]}</span>
+                  </button>`).join('')}
+              </div>
+              <div class="portfolio-filter">
+                <div class="chip-row" role="group" aria-label="按分类筛选">
+                  ${['全部', ...CATEGORIES[filters.section]].map(c => `
+                    <button type="button" class="chip ${filters.category === c ? 'is-on' : ''}" data-category="${escapeHtml(c)}" aria-pressed="${filters.category === c}">${escapeHtml(c)}</button>`).join('')}
+                </div>
+                <button type="button" class="chip chip--star ${filters.featured ? 'is-on' : ''}" data-featured aria-pressed="${filters.featured}">${icon('star', 14)} 仅看精选</button>
+              </div>
+            </div>
+            <p class="pf-note">封面建议 4:3 或 16:9；上传后自动压缩到长边 ≤ 1600px，图片只保存在本机 IndexedDB。</p>
           </div>
-          <button type="button" class="chip chip--star ${filters.featured ? 'is-on' : ''}" data-featured aria-pressed="${filters.featured}">${icon('star', 14)} 仅看精选</button>
+        </section>
+
+        ${list.length ? sceneHTML(list) : `
+        <section class="pf3-empty">
+          ${emptyState({
+            title: `${SECTIONS[filters.section]}分区还没有作品`,
+            description: filters.section === 'design'
+              ? '把海报、画册、Logo、包装的成品图传进来，写清你的角色与工具，就是一份可投递的作品集。'
+              : '把写过的页面、小工具、练习题放进来，附上仓库或在线 demo 链接。',
+            action: `<button type="button" class="btn btn-primary" data-work-new>${icon('plus', 16)} 添加${SECTIONS[filters.section]}作品</button>`
+          })}
+        </section>`}
+      `;
+
+      hydrateImages(root);
+      if (list.length) initScene();
+      window.dispatchEvent(new CustomEvent('dw:view-rendered'));
+    }
+
+    function sceneHTML(list) {
+      return `
+      <section class="pf3-journey ${staticMode ? 'is-static' : ''}" data-journey style="--n:${list.length}">
+        <div class="pf3-stage">
+          <canvas class="pf3-canvas" data-cam aria-hidden="true"></canvas>
+          <div class="pf3-shade" aria-hidden="true"></div>
+          <div class="pf3-loading" data-loading>相机装填中 · 正在取封面</div>
+          <div class="cam-perf" data-perf hidden></div>
+
+          <header class="pf3-headline">
+            <div>
+              <p class="cam-kicker"><span>02</span> Spatial index</p>
+              <h2>${SECTIONS[filters.section]} / ${filters.category === '全部' ? '全部作品' : escapeHtml(filters.category)}</h2>
+            </div>
+            <p>Move camera →</p>
+          </header>
+
+          <div class="pf3-caption" data-caption aria-live="polite"></div>
+
+          <div class="pf3-static">
+            ${list.map((w, i) => staticCard(w, i, list.length)).join('')}
+          </div>
+
+          <div class="pf3-hint">Click<br>a frame</div>
+          <footer class="pf3-foot">
+            <span>滚动推进相机</span>
+            <div class="pf3-bar"><i data-bar></i></div>
+            <span>${String(list.length).padStart(2, '0')} works · Esc 退回</span>
+          </footer>
         </div>
-        <div id="portfolio-body"></div>
-        <p class="list-note">封面图：建议 4:3 或 16:9，上传后自动压缩到长边 ≤ 1600px；图片只保存在本机 IndexedDB。</p>`;
-      renderBody();
+      </section>`;
+    }
+
+    function staticCard(w, i, total) {
+      return `<button type="button" class="pf3-card" data-work-open="${w.id}" aria-label="查看作品：${escapeHtml(w.title)}">
+        <figure>
+          ${w.imageId
+            ? `<img data-img="${w.imageId}" alt="${escapeHtml(w.title)} 封面">`
+            : `<img src="${escapeHtml(w.cover || 'assets/covers/poster.svg')}" alt="${escapeHtml(w.title)} 封面" loading="${i < 3 ? 'eager' : 'lazy'}">`}
+        </figure>
+        <h3>${escapeHtml(w.title)}</h3>
+        <p>${escapeHtml(w.category)} · ${escapeHtml(w.year || '—')} · ${String(i + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}</p>
+      </button>`;
     }
 
     function currentList() {
@@ -71,119 +181,296 @@ export default {
         .filter(w => !filters.featured || w.featured);
     }
 
-    function renderBody() {
-      const body = root.querySelector('#portfolio-body');
-      if (!body) return;
-      const all = getState().portfolio.filter(w => w.section === filters.section);
-      if (!all.length) {
-        body.innerHTML = emptyState({
-          title: `${SECTIONS[filters.section]}分区还没有作品`,
-          description: filters.section === 'design'
-            ? '把海报、画册、Logo、包装的成品图传进来，写清你的角色与工具，就是一份可投递的作品集。'
-            : '把写过的页面、小工具、练习题放进来，附上仓库或在线 demo 链接。',
-          action: `<button type="button" class="btn btn-primary" data-work-new>${icon('plus', 16)} 添加${SECTIONS[filters.section]}作品</button>`
-        });
-        return;
-      }
-      const list = currentList();
-      if (!list.length) {
-        body.innerHTML = emptyState({
-          title: '没有匹配的作品',
-          description: '当前分类下暂无作品，试试切换分类或取消「仅看精选」。',
-          action: `<button type="button" class="btn" data-reset-filters>清除筛选</button>`
-        });
-        return;
-      }
-      body.innerHTML = `<div class="work-grid">
-        ${list.map(workCard).join('')}
-      </div>`;
-      hydrateImages(body);
+    function coverURL(w) {
+      if (w.imageId) return getImageURL(w.imageId).catch(() => '');
+      return Promise.resolve(w.cover || 'assets/covers/poster.svg');
     }
 
-    function workCard(w) {
-      return `<article class="work-card" data-work="${w.id}">
-        <button type="button" class="cover cover--work" data-work-open="${w.id}" aria-label="查看作品：${escapeHtml(w.title)}">
-          ${w.imageId
-            ? `<img data-img="${w.imageId}" alt="${escapeHtml(w.title)} 封面" loading="lazy">`
-            : `<img src="${escapeHtml(w.cover || 'assets/covers/poster.svg')}" alt="${escapeHtml(w.title)} 封面" loading="lazy">`}
-          ${w.sample ? '<span class="sample-badge">示例</span>' : ''}
-          ${w.featured ? `<span class="featured-badge" aria-label="精选">${icon('star', 12)} 精选</span>` : ''}
-        </button>
-        <div class="work-body">
-          <p class="work-meta">${escapeHtml(w.category)} · ${escapeHtml(w.year || '—')}</p>
-          <h3 class="work-title"><button type="button" class="text-btn" data-work-open="${w.id}">${escapeHtml(w.title)}</button></h3>
-          <p class="work-role">${escapeHtml(w.role || '未填角色')}</p>
-          ${w.summary ? `<p class="work-summary">${escapeHtml(clampText(w.summary, 64))}</p>` : ''}
-          <div class="work-foot">
-            <div class="work-tools">
-              ${(w.tools || []).slice(0, 3).map(t => `<span class="tag tag--mono">${escapeHtml(t)}</span>`).join('')}
-            </div>
-            ${(w.links || []).filter(l => l.url).length ? `<span class="work-link-hint">${icon('link', 14)} ${(w.links || []).filter(l => l.url).length} 个链接</span>` : ''}
-          </div>
-        </div>
-      </article>`;
+    /* ---------------- 3D 画廊 ---------------- */
+
+    function initScene() {
+      const journey = root.querySelector('[data-journey]');
+      const canvas = root.querySelector('[data-cam]');
+      if (!journey || staticMode) {
+        journey?.classList.add('is-ready');
+        updateCaption(0);
+        return;
+      }
+
+      cam = createCam3D(canvas, {
+        fogNear: 2,
+        fogFar: 17,
+        onFail: () => {
+          cam = null;
+          journey.classList.add('is-static');
+          journey.classList.add('is-ready');
+        }
+      });
+      if (!cam?.ok) {
+        cam = null;
+        journey.classList.add('is-static');
+        journey.classList.add('is-ready');
+        return;
+      }
+      cam.setPalette(currentColorsSafe());
+      cam.setCamera({ x: 0, y: 0, z: 5.6 }, { instant: true });
+
+      const n = currentWorks.length;
+      const spacing = n > 1 ? Math.min(4.8, 16 / (n - 1)) : 0;
+      const width = spacing * (n - 1);
+      const ready = () => {
+        readyCount++;
+        if (readyCount >= Math.min(3, n)) journey.classList.add('is-ready');
+      };
+
+      currentWorks.forEach((w, i) => {
+        const z = i % 2 ? -1.3 : 0.5;
+        coverURL(w).then(url => {
+          if (destroyed || !cam) return;
+          cam.addPlane({
+            id: `g-${w.id}`,
+            url,
+            x: i * spacing - width / 2,
+            y: i % 2 ? 0.18 : -0.12,
+            z,
+            w: 4.6, h: 3.4,
+            border: true,
+            data: { work: w, index: i },
+            onReady: ready
+          });
+        });
+      });
+
+      measure();
+      setTimeout(() => journey.classList.add('is-ready'), 3200);
+
+      canvas.addEventListener('click', e => {
+        if (flying) return;
+        const plane = cam?.hitTest(e.clientX, e.clientY);
+        const work = plane?.data?.work;
+        if (work) startFly(work, plane);
+      });
+      canvas.addEventListener('pointermove', e => {
+        const nx = (e.clientX / window.innerWidth) * 2 - 1;
+        const ny = -((e.clientY / window.innerHeight) * 2 - 1);
+        cam?.setPointer(nx, ny);
+      });
+      canvas.addEventListener('pointerleave', () => cam?.setPointer(0, 0));
+
+      if (new URLSearchParams(location.search).has('perf')) {
+        const hud = root.querySelector('[data-perf]');
+        if (hud) hud.hidden = false;
+      }
+
+      startLoop();
+      updateCaption(0);
     }
 
-    function openDetail(id) {
+    function currentColorsSafe() {
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+      const accent2 = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
+      return { bg, ink, accent, accent2 };
+    }
+
+    function measure() {
+      const journey = root.querySelector('[data-journey]');
+      if (!journey) return;
+      journeyTop = journey.getBoundingClientRect().top + window.scrollY;
+      journeySpan = Math.max(1, journey.offsetHeight - window.innerHeight);
+    }
+
+    function startLoop() {
+      const tick = now => {
+        if (destroyed) return;
+        const dt = lastTime ? Math.min(0.05, (now - lastTime) / 1000) : 0.016;
+        lastTime = now;
+        if (!flying) updateJourney();
+        if (cam) {
+          const stats = cam.frame(dt);
+          if (now - lastHud > 700) {
+            lastHud = now;
+            const hud = root.querySelector('[data-perf]');
+            if (hud && !hud.hidden) hud.textContent = `FPS ${stats.fps} · DRAW ${stats.drawcalls} · PLANES ${stats.planes}`;
+            window.__camStats = cam.stats();
+          }
+        }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+
+    function updateJourney() {
+      const journey = root.querySelector('[data-journey]');
+      if (!journey) return;
+      const p = Math.min(1, Math.max(0, (window.scrollY - journeyTop) / journeySpan));
+      if (Math.abs(p - progress) < 0.0008) return;
+      progress = p;
+      const bar = root.querySelector('[data-bar]');
+      if (bar) bar.style.transform = `scaleX(${p})`;
+
+      const n = currentWorks.length;
+      if (!n) return;
+      const spacing = n > 1 ? Math.min(4.8, 16 / (n - 1)) : 0;
+      const width = spacing * (n - 1);
+      cam?.setCamera({ x: -width / 2 + p * width, y: 0, z: 5.6 });
+
+      const idx = Math.max(0, Math.min(n - 1, Math.round(p * (n - 1))));
+      updateCaption(idx);
+    }
+
+    function updateCaption(idx) {
+      if (idx === activeIndex) return;
+      activeIndex = idx;
+      const w = currentWorks[idx];
+      const cap = root.querySelector('[data-caption]');
+      if (!cap || !w) return;
+      cap.innerHTML = `<h3>${escapeHtml(w.title)}</h3><p>${escapeHtml(w.category)} · ${escapeHtml(w.year || '—')} · ${String(idx + 1).padStart(2, '0')} / ${String(currentWorks.length).padStart(2, '0')}</p>`;
+    }
+
+    function startFly(work, plane) {
+      flying = true;
+      detailFromFly = true;
+      document.body.classList.add('is-pf-detail');
+      cam?.setCamera({ x: plane.x, y: plane.y, z: plane.z + 2.4 });
+      flyTimer = setTimeout(() => {
+        if (destroyed) return;
+        flying = false;
+        openDetail(work.id, { fly: false, fromFly: true });
+      }, 720);
+    }
+
+    function restoreCamera() {
+      const journey = root.querySelector('[data-journey]');
+      if (!cam || !journey) return;
+      measure();
+      const p = Math.min(1, Math.max(0, (window.scrollY - journeyTop) / journeySpan));
+      const n = currentWorks.length;
+      const spacing = n > 1 ? Math.min(4.8, 16 / (n - 1)) : 0;
+      const width = spacing * (n - 1);
+      cam.setCamera({ x: -width / 2 + p * width, y: 0, z: 5.6 });
+    }
+
+    function destroyScene() {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      clearTimeout(flyTimer);
+      flying = false;
+      cam?.destroy();
+      cam = null;
+      progress = -1;
+      activeIndex = -1;
+      readyCount = 0;
+    }
+
+    /* ---------------- 整屏详情 ---------------- */
+
+    function openDetail(id, opts = {}) {
+      closeDetail(true);
       const w = getState().portfolio.find(x => x.id === id);
       if (!w) return;
       const links = (w.links || []).filter(l => l.url);
-      const api = openModal({
-        kicker: `${SECTIONS[w.section]} / ${w.category}`,
-        title: w.title,
-        size: 'lg',
-        className: 'modal--work',
-        body: `
-          <div class="work-detail">
-            <div class="work-detail-cover cover">
+      const all = getState().portfolio.filter(x => x.section === w.section);
+      const idx = all.findIndex(x => x.id === w.id);
+      const sectionLabel = SECTIONS[w.section] || w.section;
+      detailFromFly = Boolean(opts.fromFly);
+
+      detail = document.createElement('div');
+      detail.className = 'pf-detail';
+      detail.id = 'pf-detail';
+      detail.setAttribute('role', 'dialog');
+      detail.setAttribute('aria-modal', 'true');
+      detail.setAttribute('aria-label', `${w.title} 详情`);
+      detail.innerHTML = `
+        <div class="pf-detail-inner">
+          <figure class="pf-detail-media">
+            <div class="pf-detail-img">
               ${w.imageId
                 ? `<img data-img="${w.imageId}" alt="${escapeHtml(w.title)} 封面">`
                 : `<img src="${escapeHtml(w.cover || 'assets/covers/poster.svg')}" alt="${escapeHtml(w.title)} 封面">`}
-              ${w.sample ? '<span class="sample-badge">示例</span>' : ''}
-              ${w.featured ? `<span class="featured-badge" aria-label="精选">${icon('star', 12)} 精选</span>` : ''}
             </div>
-            <div class="detail-body">
-              <dl class="detail-facts">
-                <div><dt>年份</dt><dd>${escapeHtml(w.year || '—')}</dd></div>
-                <div><dt>角色</dt><dd>${escapeHtml(w.role || '未填')}</dd></div>
-                <div><dt>分类</dt><dd>${escapeHtml(w.category)}</dd></div>
-                <div><dt>工具</dt><dd>${escapeHtml((w.tools || []).join(' / ') || '—')}</dd></div>
-              </dl>
-              <p class="work-detail-summary">${escapeHtml(w.summary || '还没有写简介。')}</p>
-              ${w.sample ? '<p class="sample-note">这是一条示例作品，用来展示版式结构，不是真实项目。</p>' : ''}
-              ${links.length ? `<div class="detail-links">
-                ${links.map(l => `<a class="btn btn-sm" href="${escapeHtml(safeUrl(l.url))}" target="_blank" rel="noopener">${icon('link', 14)} ${escapeHtml(l.label || hostOf(l.url))} ${icon('arrow', 12)}</a>`).join('')}
-              </div>` : ''}
+            <span class="pf-detail-stamp">${sectionLabel} / ${escapeHtml(w.category)} · ${String(Math.max(0, idx) + 1).padStart(2, '0')} — ${String(all.length).padStart(2, '0')}</span>
+          </figure>
+
+          <div class="pf-detail-body">
+            <button type="button" class="pf-detail-close" data-detail-close>关闭 · Esc</button>
+            <p class="pf-detail-kicker">Portfolio / ${escapeHtml(w.category)} / ${escapeHtml(w.year || '—')}</p>
+            <h2 class="pf-detail-title">${escapeHtml(w.title)}</h2>
+            <dl class="pf-detail-facts">
+              <div><dt>年份</dt><dd>${escapeHtml(w.year || '—')}</dd></div>
+              <div><dt>角色</dt><dd>${escapeHtml(w.role || '未填')}</dd></div>
+              <div><dt>分类</dt><dd>${escapeHtml(w.category)}</dd></div>
+              <div><dt>工具</dt><dd>${escapeHtml((w.tools || []).join(' / ') || '—')}</dd></div>
+            </dl>
+            <p class="pf-detail-summary">${escapeHtml(w.summary || '还没有写简介。')}</p>
+            ${w.sample ? '<p class="pf-detail-kicker">示例作品，仅用于展示版式结构，不是真实项目。</p>' : ''}
+            ${links.length ? `<div class="pf-detail-links">
+              ${links.map(l => `<a class="btn btn-sm" href="${escapeHtml(safeUrl(l.url))}" target="_blank" rel="noopener">${icon('link', 14)} ${escapeHtml(l.label || hostOf(l.url))} ${icon('arrow', 12)}</a>`).join('')}
+            </div>` : ''}
+            <div class="pf-detail-actions">
+              <button type="button" class="btn btn-danger-ghost" data-detail-del>删除</button>
+              <button type="button" class="btn btn-primary" data-detail-edit>${icon('edit', 14)} 编辑</button>
             </div>
-          </div>`,
-        footer: `<button type="button" class="btn" data-close>关闭</button>
-          <span class="form-actions-right">
-            <button type="button" class="btn btn-danger-ghost" data-detail-del>删除</button>
-            <button type="button" class="btn btn-primary" data-detail-edit>${icon('edit', 14)} 编辑</button>
-          </span>`,
-        onMount(dialog) {
-          hydrateImages(dialog);
-          dialog.querySelector('[data-detail-edit]').addEventListener('click', () => {
-            api.close('edit');
-            openEditor(w.id);
-          });
-          dialog.querySelector('[data-detail-del]').addEventListener('click', async () => {
-            const ok = await confirmDialog({
-              title: '删除这件作品？',
-              description: `「${w.title}」会从作品集中移除，封面图片也会一并删除。`,
-              confirmText: '删除作品',
-              danger: true
-            });
-            if (!ok) return;
-            if (w.imageId) deleteImage(w.imageId);
-            update(s => { s.portfolio = s.portfolio.filter(x => x.id !== w.id); });
-            toast('作品已删除');
-            api.close('deleted');
-          });
-        }
+          </div>
+        </div>`;
+
+      document.body.appendChild(detail);
+      document.body.classList.add('is-pf-detail');
+      hydrateImages(detail);
+
+      requestAnimationFrame(() => detail.classList.add('is-open'));
+      detail.querySelector('[data-detail-close]').focus({ preventScroll: true });
+
+      detail.querySelector('[data-detail-close]').addEventListener('click', () => closeDetail());
+      detail.querySelector('[data-detail-edit]').addEventListener('click', () => {
+        closeDetail(true);
+        openEditor(w.id);
       });
-      hydrateImages(api.dialog);
+      detail.querySelector('[data-detail-del]').addEventListener('click', async () => {
+        const ok = await confirmDialog({
+          title: '删除这件作品？',
+          description: `「${w.title}」会从作品集中移除，封面图片也会一并删除。`,
+          confirmText: '删除作品',
+          danger: true
+        });
+        if (!ok) return;
+        if (w.imageId) deleteImage(w.imageId);
+        closeDetail(true);
+        update(s => { s.portfolio = s.portfolio.filter(x => x.id !== w.id); });
+        toast('作品已删除');
+      });
+
+      detailKeyHandler = e => {
+        if (e.key === 'Escape') closeDetail();
+      };
+      document.addEventListener('keydown', detailKeyHandler);
     }
+
+    function closeDetail(instant = false) {
+      if (detailKeyHandler) {
+        document.removeEventListener('keydown', detailKeyHandler);
+        detailKeyHandler = null;
+      }
+      document.body.classList.remove('is-pf-detail');
+      const fromFly = detailFromFly;
+      detailFromFly = false;
+      if (!detail) {
+        if (fromFly) restoreCamera();
+        return;
+      }
+      const node = detail;
+      detail = null;
+      node.classList.remove('is-open');
+      if (instant) {
+        node.remove();
+      } else {
+        setTimeout(() => node.remove(), 860);
+        restoreCamera();
+      }
+    }
+
+    /* ---------------- 编辑器（保留原有表单） ---------------- */
 
     function linkRowHTML(label = '', url = '') {
       return `<div class="link-row">
@@ -262,7 +549,7 @@ export default {
               </div>
               <label class="check-row field--full">
                 <input type="checkbox" name="featured" ${w?.featured ? 'checked' : ''}>
-                <span>标为精选（会出现在工作台首页）</span>
+                <span>标为精选（会出现在首页场景里）</span>
               </label>
             </div>
             <div class="form-actions">
@@ -365,6 +652,8 @@ export default {
       hydrateImages(api.dialog);
     }
 
+    /* ---------------- 事件 ---------------- */
+
     function onClick(e) {
       if (e.target.closest('[data-work-new]')) {
         openEditor(null);
@@ -388,28 +677,10 @@ export default {
         renderAll();
         return;
       }
-      if (e.target.closest('[data-reset-filters]')) {
-        filters.category = '全部';
-        filters.featured = false;
-        renderAll();
-        return;
-      }
       const open = e.target.closest('[data-work-open]');
       if (open) {
         e.preventDefault();
-        openDetail(open.dataset.workOpen);
-        return;
-      }
-      const card = e.target.closest('[data-work]');
-      if (card) openDetail(card.dataset.work);
-    }
-
-    function onKeydown(e) {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      const card = e.target.closest('[data-work]');
-      if (card && e.target === card) {
-        e.preventDefault();
-        openDetail(card.dataset.work);
+        openDetail(open.dataset.workOpen, { fly: false });
       }
     }
   }

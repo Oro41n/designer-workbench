@@ -63,6 +63,34 @@ const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 const chroma = ([r, g, b]) => (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
 
+// WCAG 相对亮度与对比度：用于给自动取色加一道硬校验，保证深浅两种模式都可读
+function relativeLum([r, g, b]) {
+  const c = [r, g, b].map(v => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+
+export function contrastRatio(rgbA, rgbB) {
+  const a = relativeLum(rgbA);
+  const b = relativeLum(rgbB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+// 保持色相与饱和度，只上下调亮度，直到达到目标对比度；失败时继续逼近黑白
+function ensureContrast(fg, bg, min = 4.5) {
+  let hsl = rgbToHsl(fg);
+  let out = fg;
+  const dir = relativeLum(bg) < 0.45 ? 1 : -1;
+  for (let i = 0; i < 30; i++) {
+    if (contrastRatio(out, bg) >= min) break;
+    hsl = [hsl[0], hsl[1], clamp(hsl[2] + dir * 0.022, 0.03, 0.98)];
+    out = hslToRgb(hsl);
+  }
+  return out.map(v => Math.round(clamp(v, 0, 255)));
+}
+
 /* ---------------- 取色 ---------------- */
 
 export function extractPalette(img, k = 5) {
@@ -124,7 +152,12 @@ export function paletteFromClusters(clusters, mode = 'dark') {
   const dark = byLum[0];
   const light = byLum[byLum.length - 1];
   const byChroma = [...arr].filter(c => lum(c) > 0.04 && lum(c) < 0.92).sort((a, b) => chroma(b) - chroma(a));
-  const accentBase = byChroma[0] || light;
+  // 强调色优先取「画面占比最大的颜色」，其次才是最高饱和色：
+  // 这样夕阳照片不会因为一个小面积高饱和高光而永远把强调色拉成橙色
+  const byWeight = [...clusters].sort((a, b) => (b.weight || 0) - (a.weight || 0));
+  const dominant = byWeight[0]?.rgb || arr[0];
+  const useDominant = chroma(dominant) > 0.16 && lum(dominant) > 0.05 && lum(dominant) < 0.9;
+  const accentBase = useDominant ? dominant : (byChroma[0] || light);
   const second = byChroma.find(c => Math.abs(rgbToHsl(c)[0] - rgbToHsl(accentBase)[0]) > 22) || byChroma[1] || accentBase;
 
   const dHsl = rgbToHsl(dark);
@@ -134,9 +167,10 @@ export function paletteFromClusters(clusters, mode = 'dark') {
 
   const isDark = mode !== 'light';
   const bg = hslToRgb([dHsl[0], clamp(dHsl[1], 0, isDark ? 0.42 : 0.2), isDark ? 0.075 : 0.935]);
-  const ink = hslToRgb([lHsl[0], clamp(lHsl[1], 0, 0.16), isDark ? 0.93 : 0.1]);
-  const accent = hslToRgb([aHsl[0], clamp(Math.max(aHsl[1], 0.62), 0.45, 0.95), isDark ? 0.56 : 0.44]);
-  const accent2 = hslToRgb([sHsl[0] + 26, clamp(Math.max(sHsl[1], 0.5), 0.35, 0.9), isDark ? 0.52 : 0.46]);
+  // 对比度硬校验：正文 ink ≥ 4.6:1，强调色 ≥ 4.5:1，次要强调 ≥ 3:1
+  const ink = ensureContrast(hslToRgb([lHsl[0], clamp(lHsl[1], 0, 0.16), isDark ? 0.93 : 0.1]), bg, 4.6);
+  const accent = ensureContrast(hslToRgb([aHsl[0], clamp(Math.max(aHsl[1], 0.62), 0.45, 0.95), isDark ? 0.56 : 0.44]), bg, 4.5);
+  const accent2 = ensureContrast(hslToRgb([sHsl[0] + 26, clamp(Math.max(sHsl[1], 0.5), 0.35, 0.9), isDark ? 0.52 : 0.46]), bg, 3.0);
 
   return {
     bg: rgbToHex(bg),
@@ -144,8 +178,30 @@ export function paletteFromClusters(clusters, mode = 'dark') {
     accent: rgbToHex(accent),
     accent2: rgbToHex(accent2),
     swatches: clusters.slice(0, 6).map(c => rgbToHex(c.rgb)),
-    clusters: clusters.slice(0, 6).map(c => ({ hex: rgbToHex(c.rgb), weight: Math.round(c.weight * 100) }))
+    clusters: clusters.slice(0, 6).map(c => ({ hex: rgbToHex(c.rgb), weight: Math.round(c.weight * 100) })),
+    contrast: {
+      ink: Number(contrastRatio(ink, bg).toFixed(2)),
+      accent: Number(contrastRatio(accent, bg).toFixed(2)),
+      accent2: Number(contrastRatio(accent2, bg).toFixed(2))
+    }
   };
+}
+
+// 取不到像素时的降级路径：用 Unsplash 返回的 color 字段做色相种子，
+// 生成 4 簇近似色，再走同一套角色映射与对比度校验
+export function paletteFromSeed(hex, mode = 'dark') {
+  if (!hex) return null;
+  let base;
+  try { base = hexToRgb(hex); } catch { return null; }
+  if (!base || base.some(v => !Number.isFinite(v))) return null;
+  const [h, s, l] = rgbToHsl(base);
+  const clusters = [
+    { rgb: hslToRgb([h, clamp(Math.max(s, 0.25), 0, 1), clamp(l, 0.16, 0.56)]), weight: 0.4 },
+    { rgb: hslToRgb([h, clamp(Math.max(s, 0.4), 0, 1), clamp(l + 0.2, 0.32, 0.82)]), weight: 0.26 },
+    { rgb: hslToRgb([h + 42, clamp(Math.max(s, 0.38), 0, 1), clamp(l, 0.3, 0.72)]), weight: 0.18 },
+    { rgb: hslToRgb([h + 180, clamp(Math.max(s, 0.28), 0, 1), clamp(l, 0.26, 0.64)]), weight: 0.16 }
+  ];
+  return paletteFromClusters(clusters, mode);
 }
 
 /* ---------------- 应用 / 过渡 ---------------- */
@@ -157,7 +213,10 @@ function applyVars(colors) {
   root.style.setProperty('--ink', colors.ink);
   root.style.setProperty('--accent', colors.accent);
   root.style.setProperty('--accent-2', colors.accent2);
-  root.style.setProperty('--on-accent', lum(hexToRgb(colors.accent)) > 0.55 ? '#101010' : '#ffffff');
+  // 强调色上的文字选黑或白，取对比度更高的一侧
+  const accentRgb = hexToRgb(colors.accent);
+  const onAccent = contrastRatio([255, 255, 255], accentRgb) >= contrastRatio([16, 16, 16], accentRgb) ? '#ffffff' : '#101010';
+  root.style.setProperty('--on-accent', onAccent);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', colors.bg);
   document.body.dataset.scheme = mode;
@@ -222,6 +281,20 @@ export async function applyImagePalette(img, { mode = state.mode } = {}) {
   applyPalette(palette);
   return { ok: true, palette };
 }
+
+// 像素取色失败时的降级入口：用接口 color 字段生成主色，仍然驱动全站令牌
+export function applySeedPalette(seed, { mode = state.mode } = {}) {
+  const palette = paletteFromSeed(seed, mode);
+  if (!palette) {
+    state.source = 'fallback';
+    return { ok: false, reason: 'color 字段为空或无法解析' };
+  }
+  state.source = 'color-seed';
+  applyPalette(palette);
+  return { ok: true, palette, source: 'color-seed' };
+}
+
+export function paletteSource() { return state.source; }
 
 export function setMode(mode) {
   state.mode = mode === 'light' ? 'light' : 'dark';

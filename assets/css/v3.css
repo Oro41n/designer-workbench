@@ -1,7 +1,7 @@
 /* ============================================================
    41n / V3 — "Living Press"
    取色驱动、程序化影像层、多层视差与遮罩揭示
-   本文件：v3 令牌 + 外壳 + 首页；内页样式见 pages-v3.css
+   本文件：v3 令牌 + 外壳；首页/作品集场景见 scenes.css
    ============================================================ */
 
 :root {
@@ -218,8 +218,11 @@ body.v3 .veil-line { background: linear-gradient(90deg, var(--accent), var(--acc
 /* ---------------- 主容器 ---------------- */
 body.v3 #view { min-height: 100svh; }
 body.is-home.v3 #view { padding: 0; max-width: none; margin: 0; }
-body.v3 .view { animation: v3view 0.7s var(--ease) both; }
-@keyframes v3view { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+body.v3 .view { animation: v3view 0.55s var(--ease-inout) both; }
+@keyframes v3view {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
 
 body.v3 .site-foot--mini {
   display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between;
